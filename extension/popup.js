@@ -54,27 +54,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                chrome.tabs.sendMessage(activeTab.id, { action: "extract_text" }, (response) => {
-                    if (chrome.runtime.lastError || !response) {
-                        showStatus("Failed to extract text. Try reloading the page.", "error");
-                        analyzeBtn.disabled = false;
-                        return;
-                    }
+                // Artificial delay to let the audience read "Extracting page text..."
+                setTimeout(() => {
+                    chrome.tabs.sendMessage(activeTab.id, { action: "extract_text" }, (response) => {
+                        if (chrome.runtime.lastError || !response) {
+                            showStatus("Failed to extract text. Try reloading the page.", "error");
+                            analyzeBtn.disabled = false;
+                            return;
+                        }
 
-                    if (!response.text || response.text.trim().length === 0) {
-                        showStatus("No readable text found on this page.", "warning");
-                        analyzeBtn.disabled = false;
-                        return;
-                    }
+                        if (!response.text || response.text.trim().length === 0) {
+                            showStatus("No readable text found on this page.", "warning");
+                            analyzeBtn.disabled = false;
+                            return;
+                        }
 
-                    if (response.truncated) {
-                        showStatus("Policy text was large; analysis used the first 50,000 characters. Sending to backend...", "warning");
-                    } else {
-                        showStatus("Sending to ClauseGuard backend...", "info");
-                    }
+                        if (response.truncated) {
+                            showStatus("Policy text large. First 50k chars extracted. Sending to backend...", "warning");
+                        } else {
+                            showStatus("Sending to ClauseGuard backend...", "info");
+                        }
 
-                    sendToBackend(response);
-                });
+                        // Artificial delay to let the audience read "Sending to backend..."
+                        setTimeout(() => {
+                            sendToBackend(response);
+                        }, 800);
+                    });
+                }, 600);
             });
         });
     });
@@ -103,7 +109,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await res.json();
-            displayResults(result);
+            
+            // Add a final short delay to simulate "processing" time for the demo
+            showStatus("Processing LLM extraction and scoring...", "info");
+            setTimeout(() => {
+                displayResults(result);
+            }, 800);
+            
         } catch (error) {
             if (error.message.includes("Failed to fetch")) {
                 showStatus("Start ClauseGuard backend first: python src/dashboard.py", "error");

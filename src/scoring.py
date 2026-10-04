@@ -22,7 +22,7 @@ class ScoringEngine:
         """
         return sum(self.calculate_clause_score(c['severity_score'], c['specificity_score']) for c in clauses)
 
-    def get_portfolio_data(self, db_path):
+    def get_portfolio_data(self, db_path, exclude_service_name=None):
         """
         Extracts the portfolio structure and calculates baseline risk.
         Returns a structured dictionary of the portfolio.
@@ -39,6 +39,9 @@ class ScoringEngine:
         portfolio_entities = set()
         
         for service_id, service_name in services:
+            if exclude_service_name and service_name == exclude_service_name:
+                continue
+                
             # Get clauses for service
             cursor.execute("SELECT id, severity_score, specificity_score FROM clauses WHERE service_id = ?", (service_id,))
             clauses = cursor.fetchall()

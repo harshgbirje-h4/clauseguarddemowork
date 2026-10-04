@@ -58,5 +58,62 @@ class TestExtensionAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
 
+    @patch('dashboard.DB_PATH', ':memory:')
+    def test_save_service_success(self):
+        from src.db import init_db
+        import tempfile
+        import sqlite3
+        
+        # Create a temp DB
+        fd, path = tempfile.mkstemp()
+        init_db(path)
+        
+        with patch('dashboard.DB_PATH', path):
+            payload = {
+                "service_name": "TestService",
+                "mode": "MOCK/DEV",
+                "clauses": [
+                    {
+                        "text": "We collect your location.",
+                        "entities": ["Location Data"],
+                        "severity_score": 3.0,
+                        "specificity_score": 2.0,
+                        "risk_category": "Tracking",
+                        "canonical_entities": ["Location"]
+                    }
+                ],
+                "canonical_entities": ["Location"],
+                "risk": 5.0,
+                "policy_url": "https://test.com"
+            }
+            
+            response = self.app.post('/api/save-service', json=payload)
+            self.assertEqual(response.status_code, 201)
+            
+            # Verify in DB
+            conn = sqlite3.connect(path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM services")
+            services = cursor.fetchall()
+            self.assertEqual(len(services), 1)
+            self.assertEqual(services[0][0], "TestService")
+            conn.close()
+            
+        os.close(fd)
+        os.remove(path)
+
+    def test_save_service_missing_fields(self):
+        payload = {
+            "service_name": "TestService"
+            # missing clauses
+        }
+        response = self.app.post('/api/save-service', json=payload)
+        self.assertEqual(response.status_code, 400)
+
+    def test_save_service_invalid_payload(self):
+        response = self.app.post('/api/save-service', json={})
+        self.assertEqual(response.status_code, 400)
+
+
 if __name__ == '__main__':
     unittest.main()

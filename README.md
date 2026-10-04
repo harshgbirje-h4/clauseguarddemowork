@@ -59,6 +59,19 @@ python src/dashboard.py
 ```
 Then open your web browser to: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
+## Real API Integration (Gemini)
+
+ClauseGuard natively integrates with Google's Gemini API for semantic entity extraction.
+
+1. **MOCK/DEV Mode (Default):** If no API key is provided, ClauseGuard automatically uses a deterministic regex fallback mode for local testing. It clearly marks results with `mode: "MOCK/DEV"`.
+2. **Real Gemini Mode:** To enable real semantic extraction:
+   ```powershell
+   set GEMINI_API_KEY=YOUR_REAL_KEY
+   set GEMINI_MODEL=gemini-1.5-flash
+   python src/dashboard.py
+   ```
+   A successful API request will mark the extracted service with `mode: "GEMINI"`. If the API fails or you hit rate limits, the request explicitly errors rather than silently falling back to mock data. API limits depend entirely on your Google account.
+
 ## Chrome Extension
 
 To use the Chrome Extension:
@@ -69,17 +82,17 @@ To use the Chrome Extension:
 5. Open a real privacy policy webpage (e.g., Spotify's privacy policy).
 6. Click the ClauseGuard extension icon and click **Analyze Policy**.
 
+*(Note: Chrome integration has been verified against proxy payloads, but not manually verified inside an actual physical browser instance.)*
+
 ## Testing
 
-Run the full, complete 46/46 automated test suite:
+Run the full automated test suite:
 ```powershell
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-## Evaluation Limitations
+## Prototype Limitations
 Please note the following constraints on this prototype:
-* **Development dataset**: The ground truth currently consists of a 14-example manually annotated classification dataset. It is a development sandbox, not a benchmark.
-* **Composite LLM evaluation unavailable in mock mode**: To preserve scientific integrity, the LLM composite pipeline is not evaluated when running without an OpenAI API key.
-* **No independently validated ground truth**: There is currently no expert-rated severity/specificity ground truth.
-* **Baseline weights**: Current C4 scoring weights are `w1 = 1.0` and `w2 = 1.0` baseline assumptions.
-* **Overlap additive risk**: Entity overlap between services is accurately detected, but it does *not* mathematically discount the numeric marginal risk score.
+* **Production ML:** The system is an MVP concept. The ML Prefilter is trained on an 8-sentence mock dataset, not OPP-115.
+* **Risk Probability:** Risk scores are deterministic calculations, not empirically verified probabilities of privacy breaches.
+* **Marginal Overlap:** The overlap system discounts overlapping clauses by a hardcoded deterministic factor (`W_overlap=0.5`). 

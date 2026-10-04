@@ -71,8 +71,6 @@
                     <h3 class="font-bold mb-2">Candidate A</h3>
                     <select id="cand-a-select" class="block w-full p-2 border rounded border-gray-300 mb-2 bg-white">
                         <option value="">-- Select --</option>
-                        <option value="google">Google (Heavy Data)</option>
-                        <option value="signal">Signal (Minimal Data)</option>
                     </select>
                 </div>
                 <!-- Candidate B -->
@@ -80,8 +78,6 @@
                     <h3 class="font-bold mb-2">Candidate B</h3>
                     <select id="cand-b-select" class="block w-full p-2 border rounded border-gray-300 mb-2 bg-white">
                         <option value="">-- Select --</option>
-                        <option value="google">Google (Heavy Data)</option>
-                        <option value="signal">Signal (Minimal Data)</option>
                     </select>
                 </div>
             </div>
@@ -132,46 +128,6 @@
     </div>
 
     <script>
-        const MOCK_FIXTURES = {
-            "google": {
-                "service_name": "Google",
-                "clauses": [
-                    {
-                        "text": "We use your location data to provide local search results.",
-                        "entities": ["Location"],
-                        "severity_score": 3.0,
-                        "specificity_score": 2.0,
-                        "risk_category": "Location Tracking"
-                    },
-                    {
-                        "text": "We track IP addresses to prevent abuse.",
-                        "entities": ["IP Address"],
-                        "severity_score": 4.0,
-                        "specificity_score": 2.0,
-                        "risk_category": "Security"
-                    },
-                    {
-                        "text": "Your email address is required.",
-                        "entities": ["Email"],
-                        "severity_score": 2.0,
-                        "specificity_score": 1.0,
-                        "risk_category": "Account Data"
-                    }
-                ]
-            },
-            "signal": {
-                "service_name": "Signal",
-                "clauses": [
-                    {
-                        "text": "Your phone number is used for registration.",
-                        "entities": ["Phone Number"],
-                        "severity_score": 1.0,
-                        "specificity_score": 1.0,
-                        "risk_category": "Account Data"
-                    }
-                ]
-            }
-        };
 
         function showError(msg) {
             document.getElementById('error-message').innerText = msg;
@@ -222,8 +178,16 @@
             document.getElementById('portfolio-risk').innerText = data.portfolio_score.toFixed(1);
             const serviceList = document.getElementById('service-list');
             serviceList.innerHTML = '';
+            
+            const candA = document.getElementById('cand-a-select');
+            const candB = document.getElementById('cand-b-select');
+            candA.innerHTML = '<option value="">-- Select --</option>';
+            candB.innerHTML = '<option value="">-- Select --</option>';
+
             if (data.services.length === 0) {
                 serviceList.innerHTML = '<li class="text-gray-500 italic">Portfolio is empty.</li>';
+                candA.innerHTML = '<option value="">-- No Services Available --</option>';
+                candB.innerHTML = '<option value="">-- No Services Available --</option>';
             } else {
                 data.services.forEach(s => {
                     serviceList.innerHTML += `<li class="bg-gray-50 p-3 rounded border border-gray-200">
@@ -233,12 +197,15 @@
                         </div>
                         <div class="text-sm text-gray-600">Entities: ${s.entities.length}</div>
                     </li>`;
+                    
+                    candA.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
+                    candB.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
                 });
             }
         }
 
-        function renderCandidateResult(suffix, data, fixture) {
-            document.getElementById(`name-${suffix}`).innerText = fixture.service_name;
+        function renderCandidateResult(suffix, data) {
+            document.getElementById(`name-${suffix}`).innerText = data.candidate_name;
             document.getElementById(`risk-${suffix}`).innerText = data.candidate_service_risk.toFixed(1);
             document.getElementById(`delta-${suffix}`).innerText = data.marginal_risk_delta.toFixed(1);
             
@@ -266,15 +233,16 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        candidate_a: MOCK_FIXTURES[valA],
-                        candidate_b: MOCK_FIXTURES[valB]
+                        candidate_a: valA,
+                        candidate_b: valB
                     })
                 });
-                if (!response.ok) throw new Error('Comparison failed');
-                const result = await response.json();
                 
-                renderCandidateResult('a', result.candidate_a, MOCK_FIXTURES[valA]);
-                renderCandidateResult('b', result.candidate_b, MOCK_FIXTURES[valB]);
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Comparison failed');
+                
+                renderCandidateResult('a', result.candidate_a);
+                renderCandidateResult('b', result.candidate_b);
                 
                 document.getElementById('candidate-results').classList.remove('hidden');
             } catch (error) { showError(error.message); }

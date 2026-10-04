@@ -26,8 +26,8 @@ class TestExtractionPipeline(unittest.TestCase):
 
     def test_mock_llm_extractor(self):
         # Ensure API key is unset to force mock
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ:
+            del os.environ["GEMINI_API_KEY"]
             
         extractor = LLMExtractor("TestService", "TestCategory")
         candidates = ["We share your location data with marketing partners."]
@@ -39,7 +39,7 @@ class TestExtractionPipeline(unittest.TestCase):
         
         clause = result["clauses"][0]
         self.assertEqual(clause["text"], candidates[0])
-        self.assertIn("Location Data", clause["entities"])
+        self.assertIn("Location", clause["entities"])
         self.assertIsInstance(clause["severity_score"], float)
         self.assertIsInstance(clause["specificity_score"], float)
         self.assertIsInstance(clause["risk_category"], str)
@@ -83,8 +83,8 @@ class TestExtractionPipeline(unittest.TestCase):
             
     def test_end_to_end_pipeline(self):
         # Unset API key to use mock
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ:
+            del os.environ["GEMINI_API_KEY"]
             
         raw_text = "Welcome to our app. We share your location data with marketing partners. Thanks for using our app."
         result = extract_pipeline(raw_text, "EndToEnd", "Test")

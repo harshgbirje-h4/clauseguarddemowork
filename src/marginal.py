@@ -12,13 +12,14 @@ class MarginalRiskEngine:
         Determines the additional risk introduced by adding a candidate service.
         Performs an in-memory/structured calculation without mutating the real database.
         """
-        # 1. Get baseline portfolio
-        portfolio_data = self.scoring_engine.get_portfolio_data(self.db_path)
+        candidate_name = candidate_json.get("service_name", "Unknown Candidate")
+
+        # 1. Get baseline portfolio (excluding candidate if it already exists in DB)
+        portfolio_data = self.scoring_engine.get_portfolio_data(self.db_path, exclude_service_name=candidate_name)
         baseline_score = portfolio_data["portfolio_score"]
         existing_entities = set(portfolio_data["all_canonical_entities"])
         
         # 2. Analyze candidate service
-        candidate_name = candidate_json.get("service_name", "Unknown Candidate")
         candidate_clauses = candidate_json.get("clauses", [])
         
         # Calculate candidate score
@@ -36,11 +37,41 @@ class MarginalRiskEngine:
         new_entities = candidate_entities.difference(existing_entities)
         
         # 4. Calculate Marginal Risk
-        # Assumption: The project plan doesn't specify an explicit discounting formula for overlaps.
-        # Therefore, Marginal Risk = Risk(Portfolio + Candidate) - Risk(Portfolio)
-        # Which algebraically is just the candidate score under a simple sum aggregation.
-        marginal_risk_delta = candidate_score
+        # The model distinguishes between new privacy risk and overlapping risk at the clause level.
+        # W_overlap = 0.5: An overlap discount weight. Even if data is already collected by the portfolio,
+        # providing it to a NEW service increases the attack surface (breach risk, secondary sharing).
+        # Therefore, fully overlapping entities reduce a clause's risk by 50%, not 100%.
+        
+        W_overlap = 0.5
+        marginal_risk_delta = 0.0
+        
+        for clause in candidate_clauses:
+            clause_score = self.scoring_engine.calculate_clause_score(
+                clause.get('severity_score'), 
+                clause.get('specificity_score')
+            )
+            
+            clause_canon_entities = set()
+            for raw_entity in clause.get("entities", []):
+                clause_canon_entities.add(self.canonicalizer.canonicalize(raw_entity))
+                
+            num_entities = len(clause_canon_entities)
+            if num_entities == 0:
+                # If a clause has no extracted entities, it represents fully new unmapped risk
+                marginal_risk_delta += clause_score
+            else:
+                num_overlapping = len(clause_canon_entities.intersection(existing_entities))
+                overlap_ratio = num_overlapping / num_entities
+                discount = W_overlap * overlap_ratio
+                marginal_risk_delta += clause_score * (1.0 - discount)
+
         new_portfolio_score = baseline_score + marginal_risk_delta
+        
+        explanation = (
+            f"Candidate standalone risk is {candidate_score:.1f}. "
+            f"Found {len(overlapping_entities)} overlapping and {len(new_entities)} new entities. "
+            f"Marginal risk is calculated at {marginal_risk_delta:.1f} after applying a maximum 50% discount to clauses with overlapping data."
+        )
         
         return {
             "candidate_name": candidate_name,
@@ -49,7 +80,8 @@ class MarginalRiskEngine:
             "new_portfolio_risk": new_portfolio_score,
             "marginal_risk_delta": marginal_risk_delta,
             "overlapping_entities": list(overlapping_entities),
-            "newly_introduced_entities": list(new_entities)
+            "newly_introduced_entities": list(new_entities),
+            "marginal_risk_explanation": explanation
         }
 
 if __name__ == "__main__":

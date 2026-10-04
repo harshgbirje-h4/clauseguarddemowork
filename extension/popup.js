@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    let currentAnalysisResult = null;
     const siteNameSpan = document.getElementById('site-name');
     const analyzeBtn = document.getElementById('analyze-btn');
     const statusDiv = document.getElementById('status');
@@ -54,33 +55,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Artificial delay to let the audience read "Extracting page text..."
-                setTimeout(() => {
-                    chrome.tabs.sendMessage(activeTab.id, { action: "extract_text" }, (response) => {
-                        if (chrome.runtime.lastError || !response) {
-                            showStatus("Failed to extract text. Try reloading the page.", "error");
+                chrome.tabs.sendMessage(activeTab.id, { action: "extract_text" }, (response) => {
+                    if (chrome.runtime.lastError || !response) {
+                        showStatus("ClauseGuard couldn't analyze this page. Please refresh and try again.", "error");
+                        analyzeBtn.disabled = false;
+                        return;
+                    }
+
+                    if (!response.text || response.text.trim().length === 0) {
+                        showStatus("No readable text found on this page.", "error");
+                        analyzeBtn.disabled = false;
+                        return;
+                    }
+
+                    if (!response.isLikelyPrivacyPolicy) {
+                        if (!confirm("This page does not appear to be a privacy policy. Do you want to scan it anyway?")) {
+                            hideStatus();
                             analyzeBtn.disabled = false;
                             return;
                         }
+                    }
 
-                        if (!response.text || response.text.trim().length === 0) {
-                            showStatus("No readable text found on this page.", "warning");
-                            analyzeBtn.disabled = false;
-                            return;
-                        }
+                    if (response.truncated) {
+                        showStatus("Text is very large. Sending first 50k characters to backend...", "warning");
+                    } else {
+                        showStatus("Sending to ClauseGuard backend...", "info");
+                    }
 
-                        if (response.truncated) {
-                            showStatus("Policy text large. First 50k chars extracted. Sending to backend...", "warning");
-                        } else {
-                            showStatus("Sending to ClauseGuard backend...", "info");
-                        }
-
-                        // Artificial delay to let the audience read "Sending to backend..."
-                        setTimeout(() => {
-                            sendToBackend(response);
-                        }, 800);
-                    });
-                }, 600);
+                    sendToBackend(response);
+                });
             });
         });
     });
@@ -109,12 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await res.json();
-            
-            // Add a final short delay to simulate "processing" time for the demo
-            showStatus("Processing LLM extraction and scoring...", "info");
-            setTimeout(() => {
-                displayResults(result);
-            }, 800);
+            displayResults(result);
             
         } catch (error) {
             if (error.message.includes("Failed to fetch")) {
@@ -180,6 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             clausesDetailsDiv.appendChild(card);
         });
+
+        currentAnalysisResult = data;
+        const saveBtn = document.getElementById('save-btn');
+        const saveStatus = document.getElementById('save-status');
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Add to Portfolio";
+        saveStatus.classList.add('hidden');
     }
 
     toggleClausesBtn.addEventListener('click', () => {
@@ -189,6 +194,48 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             clausesDetailsDiv.classList.add('hidden');
             toggleClausesBtn.textContent = "View Details";
+        }
+    });
+
+    const saveBtn = document.getElementById('save-btn');
+    const saveStatus = document.getElementById('save-status');
+    
+    saveBtn.addEventListener('click', async () => {
+        if (!currentAnalysisResult) return;
+        
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+        saveStatus.classList.add('hidden');
+        
+        try {
+            const res = await fetch("http://127.0.0.1:5000/api/save-service", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(currentAnalysisResult)
+            });
+
+            if (!res.ok) {
+                let errText = "Failed to save.";
+                try {
+                    const errObj = await res.json();
+                    errText = errObj.error || errText;
+                } catch(e) {}
+                throw new Error(errText);
+            }
+
+            saveBtn.textContent = "Added to Portfolio";
+            saveStatus.textContent = "Successfully saved!";
+            saveStatus.className = "status success";
+            saveStatus.classList.remove('hidden');
+            
+        } catch (error) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Retry Add";
+            saveStatus.textContent = `Error: ${error.message}`;
+            saveStatus.className = "status error";
+            saveStatus.classList.remove('hidden');
         }
     });
 });

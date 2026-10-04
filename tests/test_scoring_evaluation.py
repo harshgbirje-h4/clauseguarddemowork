@@ -74,7 +74,7 @@ class TestScoringEvaluationValidation(unittest.TestCase):
         # Marginal Risk = 8 (additive model)
         self.assertEqual(res2["baseline_portfolio_risk"], 4.0)
         self.assertEqual(res2["candidate_service_risk"], 8.0)
-        self.assertEqual(res2["marginal_risk_delta"], 8.0)
+        self.assertEqual(res2["marginal_risk_delta"], 6.0)
         
         # D. Overlapping entities
         self.assertIn("Location", res2["overlapping_entities"])

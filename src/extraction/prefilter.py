@@ -21,6 +21,10 @@ class PrivacyPrefilter:
     def train_with_minimal_fixture(self):
         """
         Loads a minimal hardcoded training set for baseline initialization.
+        NOTE: This is a DEVELOPMENT/DEMO fallback. It is not a production ML classifier.
+        It exists solely to allow the pipeline to run locally without a real trained model.
+        In a production environment, a properly trained serialized model (e.g., joblib/pickle)
+        should be loaded instead of training on 8 sentences.
         """
         texts = [
             "We share your location data with marketing partners.",

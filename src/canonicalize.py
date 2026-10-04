@@ -10,28 +10,138 @@ class EntityCanonicalizer:
             "location information": "Location",
             "user location": "Location",
             "location": "Location",
+            "geolocation": "Location",
+            "gps location": "Location",
+            "gps": "Location",
+            "precise location": "Precise Location",
+            "exact location": "Precise Location",
+            "precise location data": "Precise Location",
             
             "ip address": "IP Address",
             "ip": "IP Address",
             "internet protocol address": "IP Address",
+            "internet protocol": "IP Address",
+            "ip addresses": "IP Address",
             
             "email address": "Email",
-            "email": "Email"
+            "e-mail address": "Email",
+            "e-mail": "Email",
+            "email": "Email",
+            
+            "phone number": "Phone Number",
+            "phone": "Phone Number",
+            "telephone number": "Phone Number",
+            "telephone": "Phone Number",
+            "mobile number": "Phone Number",
+            "mobile": "Phone Number",
+            
+            "device information": "Device Information",
+            "device": "Device Information",
+            "device id": "Device Information",
+            "hardware model": "Device Information",
+            "mac address": "Device Information",
+            "operating system": "Device Information",
+            "os": "Device Information",
+            
+            "browser information": "Browser Information",
+            "browser": "Browser Information",
+            "browser type": "Browser Information",
+            "user agent": "Browser Information",
+            
+            "cookie": "Cookies",
+            "cookies": "Cookies",
+            "web beacon": "Cookies",
+            "web beacons": "Cookies",
+            "pixel tag": "Cookies",
+            "pixel tags": "Cookies",
+            
+            "usage data": "Usage Data",
+            "log data": "Usage Data",
+            "interaction": "Usage Data",
+            "interactions": "Usage Data",
+            "click": "Usage Data",
+            "clicks": "Usage Data",
+            "page view": "Usage Data",
+            "page views": "Usage Data",
+            
+            "identifier": "Identifiers",
+            "identifiers": "Identifiers",
+            "unique identifier": "Identifiers",
+            "unique identifiers": "Identifiers",
+            "id": "Identifiers",
+            
+            "account information": "Account Information",
+            "account": "Account Information",
+            "password": "Account Information",
+            "username": "Account Information",
+            "profile": "Account Information",
+            
+            "payment information": "Payment Information",
+            "payment": "Payment Information",
+            "credit card": "Payment Information",
+            "billing": "Payment Information",
+            "financial information": "Payment Information",
+            
+            "contact information": "Contact Information",
+            "contact": "Contact Information",
+            "address": "Contact Information",
+            "postal": "Contact Information",
+            "postal address": "Contact Information",
+            
+            "biometric data": "Biometric Data",
+            "biometric": "Biometric Data",
+            "face": "Biometric Data",
+            "fingerprint": "Biometric Data",
+            "voiceprint": "Biometric Data",
+            
+            "advertising data": "Advertising Data",
+            "advertising": "Advertising Data",
+            "marketing": "Advertising Data",
+            "ad": "Advertising Data",
+            "ads": "Advertising Data",
+            
+            "analytics data": "Analytics Data",
+            "analytics": "Analytics Data",
+            "measure": "Analytics Data",
+            "measurement": "Analytics Data",
+            "performance": "Analytics Data",
+            
+            "communications": "Communications",
+            "communication": "Communications",
+            "message": "Communications",
+            "messages": "Communications",
+            "chat": "Communications",
+            "chats": "Communications",
+            "correspondence": "Communications",
+            
+            "name": "Name",
+            "first name": "Name",
+            "last name": "Name",
+            "full name": "Name",
+            
+            "general data": "General Data"
         }
 
     def canonicalize(self, raw_entity):
         """
         Normalize and map raw entity to canonical entity.
         """
+        if not raw_entity:
+            return None
+            
         # Trim whitespace and convert to lowercase for matching
         normalized_input = " ".join(raw_entity.split()).strip().lower()
+        
+        if not normalized_input:
+            return None
         
         # Check explicit mapping
         if normalized_input in self.mapping:
             return self.mapping[normalized_input]
             
-        # If unknown, create a deterministic human-readable canonical form (Title Case)
-        return " ".join(raw_entity.split()).strip().title()
+        # Do not silently convert unknown entities into misleading canonical names.
+        # Leave them identifiable as unknown mapping.
+        return f"Unknown: {raw_entity.strip()}"
 
 
 class DatabaseLoader:
@@ -61,6 +171,9 @@ class DatabaseLoader:
             if not service_row:
                 raise RuntimeError("Failed to retrieve service_id")
             service_id = service_row[0]
+
+            # Clear existing clauses for this service to ensure idempotence
+            cursor.execute("DELETE FROM clauses WHERE service_id = ?", (service_id,))
 
             # 2. Process Clauses
             for clause in clauses:
@@ -92,6 +205,8 @@ class DatabaseLoader:
                 # 3. Canonicalize and Insert Entities + Mapping
                 for raw_entity in raw_entities:
                     canon_name = canonicalizer.canonicalize(raw_entity)
+                    if not canon_name:
+                        continue
                     
                     # Insert or get Canonical Entity
                     cursor.execute("INSERT OR IGNORE INTO canonical_entities (name) VALUES (?)", (canon_name,))

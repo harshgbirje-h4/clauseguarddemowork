@@ -32,8 +32,8 @@ class TestCanonicalization(unittest.TestCase):
         self.assertEqual(c.canonicalize("Email Address"), "Email")
         
         # Unknown entity preservation
-        self.assertEqual(c.canonicalize("Browser Fingerprint"), "Browser Fingerprint")
-        self.assertEqual(c.canonicalize("  weird   SPACING "), "Weird Spacing")
+        self.assertEqual(c.canonicalize("Browser Fingerprint"), "Unknown: Browser Fingerprint")
+        self.assertEqual(c.canonicalize("  weird   SPACING "), "Unknown: weird   SPACING")
 
     def test_db_loading_and_relationships(self):
         data = {

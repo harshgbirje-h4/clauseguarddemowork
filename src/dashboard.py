@@ -2,6 +2,9 @@ import os
 import sys
 import logging
 from flask import Flask, request, jsonify, send_from_directory
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -67,13 +70,16 @@ def analyze_policy():
     url = data.get("url", "")
     title = data.get("title", "")
     
-    # Simple service name extraction fallback
-    service_name = title.split('-')[0].strip() if title else ""
-    if not service_name and url:
-        # Very naive fallback from URL
+    # Always prioritize domain name so everything doesn't get grouped as "Privacy Policy"
+    service_name = ""
+    if url:
         import urllib.parse
         parsed = urllib.parse.urlparse(url)
-        service_name = parsed.netloc.replace('www.', '').split('.')[0].capitalize()
+        if parsed.netloc:
+            service_name = parsed.netloc.replace('www.', '').split('.')[0].capitalize()
+            
+    if not service_name and title:
+        service_name = title.split('-')[0].strip()
         
     if not service_name:
         service_name = "Unknown Web Service"
@@ -86,7 +92,7 @@ def analyze_policy():
         canonicalizer = EntityCanonicalizer()
         all_canonical_entities = set()
         for clause in extracted.get("clauses", []):
-            canon_list = [canonicalizer.canonicalize(e) for e in clause.get("entities", [])]
+            canon_list = [c_e for e in clause.get("entities", []) if (c_e := canonicalizer.canonicalize(e)) is not None]
             clause["canonical_entities"] = canon_list
             all_canonical_entities.update(canon_list)
             
@@ -94,7 +100,7 @@ def analyze_policy():
         scoring_engine = ScoringEngine()
         risk = scoring_engine.calculate_service_score_from_clauses(extracted.get("clauses", []))
         
-        mode = "LIVE" if "OPENAI_API_KEY" in os.environ else "MOCK/DEV"
+        mode = extracted.get("mode", "UNKNOWN")
         
         # Assemble Response
         response_data = {
@@ -110,6 +116,25 @@ def analyze_policy():
     except Exception as e:
         logging.error(f"Analysis failed: {e}")
         return jsonify({"error": f"Extraction failed: {str(e)}"}), 500
+
+@app.route('/api/save-service', methods=['POST', 'OPTIONS'])
+def save_service():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    data = request.json
+    if not data or 'service_name' not in data or 'clauses' not in data:
+        return jsonify({"error": "Invalid analysis result data"}), 400
+
+    try:
+        from src.canonicalize import DatabaseLoader
+        canonicalizer = EntityCanonicalizer()
+        loader = DatabaseLoader(DB_PATH)
+        loader.load_extraction(data, canonicalizer)
+        return jsonify({"status": "success", "message": "Service added to portfolio"}), 201
+    except Exception as e:
+        logging.error(f"Save failed: {e}")
+        return jsonify({"error": f"Failed to save service: {str(e)}"}), 500
 
 @app.route('/api/overlap-graph', methods=['GET'])
 def get_overlap_graph():
@@ -157,15 +182,58 @@ def compare_services():
     req_data = request.json
     if not req_data or 'candidate_a' not in req_data or 'candidate_b' not in req_data:
         return jsonify({"error": "Must provide candidate_a and candidate_b"}), 400
+
+    def get_candidate(candidate_data):
+        if isinstance(candidate_data, dict):
+            return candidate_data
+            
+        # Fetch from DB if string
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM services WHERE name = ?", (candidate_data,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Service not found: {candidate_data}")
+            
+        service_id = row[0]
+        cursor.execute("SELECT id, text, severity_score, specificity_score, risk_category FROM clauses WHERE service_id = ?", (service_id,))
+        clauses = []
+        for c_id, text, sev, spec, cat in cursor.fetchall():
+            cursor.execute("""
+                SELECT ce.name 
+                FROM canonical_entities ce
+                JOIN clause_entity_mapping cem ON ce.id = cem.entity_id
+                WHERE cem.clause_id = ?
+            """, (c_id,))
+            ents = [r[0] for r in cursor.fetchall()]
+            clauses.append({
+                "text": text,
+                "severity_score": sev,
+                "specificity_score": spec,
+                "risk_category": cat,
+                "entities": ents
+            })
+        conn.close()
+        return {
+            "service_name": candidate_data,
+            "clauses": clauses
+        }
         
-    engine = MarginalRiskEngine(DB_PATH)
     try:
-        res_a = engine.calculate_marginal_risk(req_data["candidate_a"])
-        res_b = engine.calculate_marginal_risk(req_data["candidate_b"])
+        cand_a = get_candidate(req_data["candidate_a"])
+        cand_b = get_candidate(req_data["candidate_b"])
+        
+        engine = MarginalRiskEngine(DB_PATH)
+        res_a = engine.calculate_marginal_risk(cand_a)
+        res_b = engine.calculate_marginal_risk(cand_b)
         return jsonify({
             "candidate_a": res_a,
             "candidate_b": res_b
         })
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

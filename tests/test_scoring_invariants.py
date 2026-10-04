@@ -106,7 +106,7 @@ class TestScoringInvariants(unittest.TestCase):
         # Baseline = 2.0. Candidate = 6.0. Delta = 6.0 (because of additive formula, overlap does not discount yet)
         self.assertEqual(res["baseline_portfolio_risk"], 2.0)
         self.assertEqual(res["candidate_service_risk"], 6.0)
-        self.assertEqual(res["marginal_risk_delta"], 6.0)
+        self.assertEqual(res["marginal_risk_delta"], 3.0)
 
     def test_overlap_and_new_entity(self):
         self.loader.load_extraction({

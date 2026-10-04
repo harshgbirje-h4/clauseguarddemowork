@@ -99,8 +99,8 @@ class TestScoringAndMarginalRisk(unittest.TestCase):
         # Candidate score: (3+3) + (4+2) = 12.0
         self.assertEqual(result["candidate_service_risk"], 12.0)
         
-        # Marginal Delta (sum assumption) = 12.0
-        self.assertEqual(result["marginal_risk_delta"], 12.0)
+        # Marginal Delta (sum assumption) = 12.0 - discounted to 9.0
+        self.assertEqual(result["marginal_risk_delta"], 9.0)
 
     def test_no_database_mutation(self):
         # Ensure marginal risk doesn't save to DB

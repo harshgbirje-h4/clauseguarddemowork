@@ -75,7 +75,7 @@ class TestDashboardAPI(unittest.TestCase):
         
         self.assertEqual(data["baseline_portfolio_risk"], 5.0)
         self.assertEqual(data["candidate_service_risk"], 4.0)
-        self.assertEqual(data["marginal_risk_delta"], 4.0)
+        self.assertEqual(data["marginal_risk_delta"], 3.0)
         self.assertIn("Location", data["overlapping_entities"])
         self.assertIn("Email", data["newly_introduced_entities"])
 

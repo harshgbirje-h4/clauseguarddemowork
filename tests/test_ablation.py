@@ -12,8 +12,8 @@ class TestAblationStudy(unittest.TestCase):
     
     def test_ablation_experiment_execution(self):
         # Force mock mode
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ:
+            del os.environ["GEMINI_API_KEY"]
             
         result = run_ablation_experiment()
         

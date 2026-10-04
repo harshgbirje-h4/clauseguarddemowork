@@ -43,7 +43,7 @@ def run_ablation_experiment():
     prefilter_metrics = calculate_metrics(y_true, y_prefilter)
     
     # 3. Composite Pipeline
-    is_real_llm = "OPENAI_API_KEY" in os.environ
+    is_real_llm = "GEMINI_API_KEY" in os.environ
     
     if is_real_llm:
         composite_metrics = None

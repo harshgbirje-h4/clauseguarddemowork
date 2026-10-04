@@ -11,8 +11,8 @@ class TestDemoRunner(unittest.TestCase):
     
     def test_demo_execution(self):
         # Unset API key to ensure mock mode
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        if "GEMINI_API_KEY" in os.environ:
+            del os.environ["GEMINI_API_KEY"]
             
         # Get baseline modification time of the real database if it exists
         real_db_path = os.path.join('data', 'db', 'portfolio.db')

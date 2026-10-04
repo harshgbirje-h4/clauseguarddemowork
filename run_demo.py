@@ -2,6 +2,9 @@ import os
 import sys
 import json
 import tempfile
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Ensure src is in path so we can import modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
@@ -34,9 +37,9 @@ def run_end_to_end_demo():
             raw_text = f.read()
             
         print("Service: Spotify")
-        # Explicitly clear OPENAI_API_KEY for the demo to force Mock mode unless user really wants it
+        # Explicitly clear GEMINI_API_KEY for the demo to force Mock mode unless user really wants it
         # Actually, let's just indicate Mock mode if it's missing
-        mode = "REAL" if "OPENAI_API_KEY" in os.environ else "MOCK/DEV"
+        mode = "REAL" if "GEMINI_API_KEY" in os.environ else "MOCK/DEV"
         print(f"Mode: {mode}")
         
         spotify_extracted = extract_pipeline(raw_text, "Spotify", "Streaming")

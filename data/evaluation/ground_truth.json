@@ -1,92 +1,48 @@
 {
-  "version": "1.0",
-  "dataset_type": "MANUALLY_ANNOTATED_DEVELOPMENT_EVALUATION",
-  "task": "privacy_clause_classification",
-  "notes": "Dataset created manually to ensure zero overlap/data leakage with the prefilter's training set.",
+  "version": "2.0",
+  "dataset_type": "40_CLAUSE_ANNOTATION",
+  "task": "privacy_clause_and_entity_classification",
+  "notes": "Expanded 40-clause evaluation dataset with entity ground truth for Precision, Recall, F1, and Entity-Resolution evaluation.",
   "examples": [
-    {
-      "id": "eval_001",
-      "text": "Our servers automatically record your browsing history.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_002",
-      "text": "Please press the confirmation button to proceed.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_003",
-      "text": "We may distribute your email address to our affiliates.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_004",
-      "text": "The volume settings can be adjusted in the audio menu.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_005",
-      "text": "GPS coordinates are continuously transmitted to our background service.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_006",
-      "text": "Thank you for installing our software suite.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_007",
-      "text": "Device identifiers such as IMEI and MAC address are collected upon installation.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_008",
-      "text": "We retain your personal contact information for up to five years.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_009",
-      "text": "Third-party advertising networks track your behavior across different websites.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_010",
-      "text": "You must be at least 18 years old to create an account.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_011",
-      "text": "Any disputes will be resolved under the laws of the State of California.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_012",
-      "text": "This application may crash on older operating systems.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_013",
-      "text": "We use web beacons to understand how users interact with our promotional emails.",
-      "label": 1,
-      "source": "Manually authored evaluation example"
-    },
-    {
-      "id": "eval_014",
-      "text": "Please restart your computer to apply the updates.",
-      "label": 0,
-      "source": "Manually authored evaluation example"
-    }
+    {"id": "eval_001", "text": "Our servers automatically record your browsing history.", "label": 1, "entities": ["Usage Data"]},
+    {"id": "eval_002", "text": "Please press the confirmation button to proceed.", "label": 0, "entities": []},
+    {"id": "eval_003", "text": "We may distribute your email address to our affiliates.", "label": 1, "entities": ["Email"]},
+    {"id": "eval_004", "text": "The volume can be adjusted using the side buttons.", "label": 0, "entities": []},
+    {"id": "eval_005", "text": "We require access to your exact GPS coordinates to deliver food.", "label": 1, "entities": ["Precise Location"]},
+    {"id": "eval_006", "text": "Please select your preferred theme in settings.", "label": 0, "entities": []},
+    {"id": "eval_007", "text": "Your IP address is logged when you visit our servers.", "label": 1, "entities": ["IP Address"]},
+    {"id": "eval_008", "text": "Battery life depends on screen brightness.", "label": 0, "entities": []},
+    {"id": "eval_009", "text": "We sell user location data to advertising networks.", "label": 1, "entities": ["Location", "Advertising Data"]},
+    {"id": "eval_010", "text": "Enter your username to begin the game.", "label": 0, "entities": []},
+    {"id": "eval_011", "text": "This app collects your facial biometric data for login.", "label": 1, "entities": ["Biometric Data"]},
+    {"id": "eval_012", "text": "You can change the font size here.", "label": 0, "entities": []},
+    {"id": "eval_013", "text": "We track your physical location at all times.", "label": 1, "entities": ["Location"]},
+    {"id": "eval_014", "text": "Press enter to submit.", "label": 0, "entities": []},
+    {"id": "eval_015", "text": "Your telephone number will be used for SMS marketing.", "label": 1, "entities": ["Phone Number", "Advertising Data"]},
+    {"id": "eval_016", "text": "Turn left at the next intersection.", "label": 0, "entities": []},
+    {"id": "eval_017", "text": "We use cookies to analyze site traffic.", "label": 1, "entities": ["Cookies", "Analytics Data"]},
+    {"id": "eval_018", "text": "The quick brown fox jumps over the lazy dog.", "label": 0, "entities": []},
+    {"id": "eval_019", "text": "Your credit card information is processed by Stripe.", "label": 1, "entities": ["Payment Information"]},
+    {"id": "eval_020", "text": "Please read these terms carefully.", "label": 0, "entities": []},
+    {"id": "eval_021", "text": "We record all chat communications for quality assurance.", "label": 1, "entities": ["Communications"]},
+    {"id": "eval_022", "text": "Swipe right to delete the message.", "label": 0, "entities": []},
+    {"id": "eval_023", "text": "We collect your device MAC address and OS version.", "label": 1, "entities": ["Device Information"]},
+    {"id": "eval_024", "text": "This feature requires a premium subscription.", "label": 0, "entities": []},
+    {"id": "eval_025", "text": "We share your contact information with third parties.", "label": 1, "entities": ["Contact Information"]},
+    {"id": "eval_026", "text": "To exit, click the close window icon.", "label": 0, "entities": []},
+    {"id": "eval_027", "text": "We assign a unique advertising identifier to your device.", "label": 1, "entities": ["Identifiers", "Advertising Data"]},
+    {"id": "eval_028", "text": "Music will pause automatically.", "label": 0, "entities": []},
+    {"id": "eval_029", "text": "Your browser type and version are logged.", "label": 1, "entities": ["Browser Information"]},
+    {"id": "eval_030", "text": "This software is provided as is without warranty.", "label": 0, "entities": []},
+    {"id": "eval_031", "text": "We collect your full name and postal address.", "label": 1, "entities": ["Name", "Contact Information"]},
+    {"id": "eval_032", "text": "Download speed varies by network.", "label": 0, "entities": []},
+    {"id": "eval_033", "text": "Your account password is encrypted.", "label": 1, "entities": ["Account Information"]},
+    {"id": "eval_034", "text": "Enjoy your customized experience.", "label": 0, "entities": []},
+    {"id": "eval_035", "text": "We track your clicks and page views for analytics.", "label": 1, "entities": ["Usage Data", "Analytics Data"]},
+    {"id": "eval_036", "text": "Save your progress before quitting.", "label": 0, "entities": []},
+    {"id": "eval_037", "text": "Your fingerprint data is stored locally.", "label": 1, "entities": ["Biometric Data"]},
+    {"id": "eval_038", "text": "Please wait while it loads.", "label": 0, "entities": []},
+    {"id": "eval_039", "text": "We may use your personal data to target ads to you.", "label": 1, "entities": ["Advertising Data"]},
+    {"id": "eval_040", "text": "Welcome to our application.", "label": 0, "entities": []}
   ]
 }

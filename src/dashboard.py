@@ -76,7 +76,18 @@ def analyze_policy():
         import urllib.parse
         parsed = urllib.parse.urlparse(url)
         if parsed.netloc:
-            service_name = parsed.netloc.replace('www.', '').split('.')[0].capitalize()
+            parts = parsed.netloc.split('.')
+            if parts[0] == 'www':
+                parts = parts[1:]
+                
+            if len(parts) >= 2:
+                if parts[-2] in ['co', 'com', 'org', 'net', 'edu', 'gov'] and len(parts) >= 3:
+                    domain = parts[-3]
+                else:
+                    domain = parts[-2]
+                service_name = domain.capitalize()
+            elif len(parts) == 1:
+                service_name = parts[0].capitalize()
             
     if not service_name and title:
         service_name = title.split('-')[0].strip()
@@ -174,6 +185,55 @@ def get_overlap_graph():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/quick-compare', methods=['POST'])
+def quick_compare():
+    if not os.path.exists(DB_PATH):
+        return jsonify({"error": "Portfolio database not found"}), 404
+        
+    req_data = request.json
+    if not req_data or 'candidate' not in req_data or 'target' not in req_data:
+        return jsonify({"error": "Must provide candidate and target"}), 400
+        
+    candidate = req_data['candidate']
+    target_name = req_data['target']
+    
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM services WHERE name = ?", (target_name,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": f"Service not found: {target_name}"}), 404
+        
+    target_id = row[0]
+    cursor.execute("""
+        SELECT DISTINCT ce.name 
+        FROM canonical_entities ce
+        JOIN clause_entity_mapping cem ON ce.id = cem.entity_id
+        JOIN clauses c ON cem.clause_id = c.id
+        WHERE c.service_id = ?
+    """, (target_id,))
+    target_entities = set(r[0] for r in cursor.fetchall())
+    conn.close()
+    
+    candidate_entities = set()
+    from src.canonicalize import EntityCanonicalizer
+    canonicalizer = EntityCanonicalizer()
+    for clause in candidate.get("clauses", []):
+        for e in clause.get("entities", []):
+            ce = canonicalizer.canonicalize(e)
+            if ce and not ce.startswith("Unknown"):
+                candidate_entities.add(ce)
+                
+    overlap = candidate_entities.intersection(target_entities)
+    new_ents = candidate_entities.difference(target_entities)
+    
+    return jsonify({
+        "overlap": list(overlap),
+        "new": list(new_ents)
+    })
+
 @app.route('/api/compare-services', methods=['POST'])
 def compare_services():
     if not os.path.exists(DB_PATH):
@@ -240,6 +300,26 @@ def compare_services():
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/api/proxy-fetch', methods=['POST', 'OPTIONS'])
+def proxy_fetch():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    try:
+        url = request.json.get("url")
+        import requests
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
+        res = requests.get(url, headers=headers, timeout=10)
+        
+        html = res.text
+        
+        # If the website blocks our Python bot (e.g. Cloudflare 403 or 200 Challenge), throw an error
+        if res.status_code != 200 or "Just a moment..." in html or "cloudflare" in html.lower() or "datadome" in html.lower():
+            return jsonify({"error": f"Website blocked the background fetch."}), 403
+            
+        return jsonify({"html": html}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting ClauseGuard Dashboard...")

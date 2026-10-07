@@ -44,6 +44,17 @@
         <!-- Clauses injected here -->
       </div>
       
+      <div class="compare-section" id="compare-section" class="hidden" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: none;">
+        <h3 style="font-size: 13px; color: #475569; margin-bottom: 8px;">Compare against saved website:</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <select id="compare-target" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; color: #334155;">
+                <option value="">-- Select website --</option>
+            </select>
+            <button id="compare-btn" class="btn-small" style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer;">Compare</button>
+        </div>
+        <div id="compare-results" class="hidden" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #334155; line-height: 1.5;"></div>
+      </div>
+      
       <div class="save-section" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
         <button id="save-btn" class="btn">Add to Portfolio</button>
         <div id="save-status" class="status hidden" style="margin-top: 10px;"></div>

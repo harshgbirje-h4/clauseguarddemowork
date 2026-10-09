@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (result.cachedAnalysis && result.cachedAnalysis.url === url.hostname) {
                         showStatus("Analyzed automatically by Login Shield.", "success");
                         displayResults(result.cachedAnalysis.data);
-                        analyzeBtn.style.display = "none"; // Hide button since it's already analyzed
+                        analyzeBtn.style.display = "none";
                     }
                 });
             } catch (e) {
@@ -37,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hideStatus() {
         statusDiv.classList.add('hidden');
+    }
+
+    function getRiskBand(score) {
+        if (score < 15) return "Low";
+        if (score < 30) return "Moderate";
+        return "High";
     }
 
     analyzeBtn.addEventListener('click', () => {
@@ -80,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (response.error && response.blockedBySecurity) {
                         showStatus(response.message, "error");
                         analyzeBtn.disabled = false;
-                        return; // Completely stop the AI analysis since we are blocked
+                        return;
                     }
 
                     if (!response.isLikelyPrivacyPolicy) {
@@ -117,49 +123,60 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // (sendToBackend has been removed because content.js handles it now)
-
     function displayResults(data) {
         hideStatus();
         analyzeBtn.disabled = false;
         resultsDiv.classList.remove('hidden');
 
-        document.getElementById('risk-score').textContent = data.risk.toFixed(1);
-        document.getElementById('api-mode').textContent = data.mode;
+        const score = data.risk || 0;
+        document.getElementById('risk-score').textContent = score.toFixed(1);
         
-        // Mode styling
-        const modeEl = document.getElementById('mode-indicator');
-        if (data.mode === "MOCK/DEV") {
-            modeEl.style.backgroundColor = "#fef08a"; // yellow
-            modeEl.style.color = "#854d0e";
-        } else {
-            modeEl.style.backgroundColor = "#bbf7d0"; // green
-            modeEl.style.color = "#166534";
+        const band = getRiskBand(score);
+        const bandEl = document.getElementById('risk-band');
+        if (bandEl) {
+            bandEl.textContent = band;
+            bandEl.className = `band ${band}`;
         }
 
+        const gaugeFill = document.getElementById('gauge-fill');
+        if (gaugeFill) {
+            const pct = Math.min(100, Math.round((score / 40) * 100));
+            gaugeFill.style.width = `${pct}%`;
+        }
+
+        const modeText = document.getElementById('mode-text');
+        const apiModeTop = document.getElementById('api-mode');
+        if (modeText) modeText.textContent = data.mode;
+        if (apiModeTop) {
+            apiModeTop.textContent = data.mode;
+            apiModeTop.className = `conn ${data.mode.includes("GEMINI") ? "live" : "mock"}`;
+        }
+
+        // Detected entities as chips
         const entitiesList = document.getElementById('entities-list');
         entitiesList.innerHTML = '';
-        if (data.canonical_entities.length === 0) {
-            entitiesList.innerHTML = '<li>None detected</li>';
+        if (!data.canonical_entities || data.canonical_entities.length === 0) {
+            entitiesList.innerHTML = '<span class="chip">None detected</span>';
         } else {
             data.canonical_entities.forEach(ent => {
-                const li = document.createElement('li');
-                li.textContent = ent;
-                entitiesList.appendChild(li);
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = ent;
+                entitiesList.appendChild(chip);
             });
         }
 
         document.getElementById('clause-count').textContent = data.clauses.length;
 
+        // Clauses list
         clausesDetailsDiv.innerHTML = '';
         data.clauses.forEach(c => {
             const card = document.createElement('div');
             card.className = 'clause-card';
             
-            // Limit text length in UI
             let text = c.text;
-            if (text.length > 150) {
-                text = text.substring(0, 150) + '...';
+            if (text.length > 140) {
+                text = text.substring(0, 140) + '...';
             }
 
             const risk = ((c.severity_score || 0) + (c.specificity_score || 0)).toFixed(1);
@@ -167,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="clause-text">"${text}"</div>
                 <div class="clause-meta">
-                    <span>Cat: ${c.risk_category || 'N/A'}</span>
-                    <span>Risk: ${risk}</span>
+                    <span>${c.risk_category || 'General Risk'}</span>
+                    <span>Risk: <b>${risk}</b></span>
                 </div>
             `;
             clausesDetailsDiv.appendChild(card);
@@ -182,8 +199,11 @@ document.addEventListener('DOMContentLoaded', () => {
         saveStatus.classList.add('hidden');
         
         // Show compare section and fetch portfolio
-        document.getElementById('compare-section').style.display = 'block';
-        fetchPortfolio();
+        const compareSection = document.getElementById('compare-section');
+        if (compareSection) {
+            compareSection.style.display = 'block';
+            fetchPortfolio();
+        }
     }
 
     async function fetchPortfolio() {
@@ -220,95 +240,99 @@ document.addEventListener('DOMContentLoaded', () => {
     const compareBtn = document.getElementById('compare-btn');
     const compareResults = document.getElementById('compare-results');
 
-    compareBtn.addEventListener('click', async () => {
-        if (!currentAnalysisResult) return;
-        const target = document.getElementById('compare-target').value;
-        if (!target) {
-            compareResults.innerHTML = "<span style='color:#ef4444;'>Please select a website.</span>";
-            compareResults.classList.remove('hidden');
-            return;
-        }
-        
-        compareBtn.disabled = true;
-        compareBtn.textContent = "Wait...";
-        
-        try {
-            const res = await fetch("http://127.0.0.1:5000/api/quick-compare", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    candidate: currentAnalysisResult,
-                    target: target
-                })
-            });
+    if (compareBtn) {
+        compareBtn.addEventListener('click', async () => {
+            if (!currentAnalysisResult) return;
+            const target = document.getElementById('compare-target').value;
+            if (!target) {
+                compareResults.innerHTML = "<span style='color:var(--alert);'>Please select a website.</span>";
+                compareResults.classList.remove('hidden');
+                return;
+            }
             
-            if (!res.ok) throw new Error("Comparison failed");
-            const data = await res.json();
+            compareBtn.disabled = true;
+            compareBtn.textContent = "Wait...";
             
-            let overlapText = data.overlap.length > 0 ? data.overlap.join(", ") : "None";
-            let newText = data.new.length > 0 ? data.new.join(", ") : "None";
-            
-            let html = `
-                <div style="margin-bottom: 6px;"><strong>⚖️ Overlap with ${target}:</strong> ${data.overlap.length} entities</div>
-                <div style="color: #64748b; font-size: 12px; margin-bottom: 12px;">${overlapText}</div>
+            try {
+                const res = await fetch("http://127.0.0.1:5000/api/quick-compare", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        candidate: currentAnalysisResult,
+                        target: target
+                    })
+                });
                 
-                <div style="margin-bottom: 6px;"><strong>🚨 NEW Risks added:</strong> ${data.new.length} entities</div>
-                <div style="color: ${data.new.length > 0 ? '#ef4444' : '#22c55e'}; font-size: 12px; margin-bottom: 8px;">${newText}</div>
+                if (!res.ok) throw new Error("Comparison failed");
+                const data = await res.json();
                 
-                <div style="font-weight: bold; color: ${data.new.length > 0 ? '#dc2626' : '#16a34a'}; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">
-                    ${data.new.length > 0 ? '⚠️ Warning: You are exposing new data!' : '✅ Safe: No new data types exposed.'}
-                </div>
-            `;
-            compareResults.innerHTML = html;
-            compareResults.classList.remove('hidden');
-        } catch (e) {
-            compareResults.innerHTML = "<span style='color:#ef4444;'>Error comparing websites.</span>";
-            compareResults.classList.remove('hidden');
-        } finally {
-            compareBtn.disabled = false;
-            compareBtn.textContent = "Compare";
-        }
-    });
+                let overlapText = data.overlap.length > 0 ? data.overlap.join(", ") : "None";
+                let newText = data.new.length > 0 ? data.new.join(", ") : "None";
+                
+                let html = `
+                    <div style="margin-bottom: 6px;"><b>⚖️ Overlap with ${target}:</b> ${data.overlap.length} entities</div>
+                    <div style="color: var(--ink-3); font-size: 11.5px; margin-bottom: 10px;">${overlapText}</div>
+                    
+                    <div style="margin-bottom: 6px;"><b>🚨 NEW Risks added:</b> ${data.new.length} entities</div>
+                    <div style="color: ${data.new.length > 0 ? 'var(--alert)' : 'var(--safe)'}; font-size: 11.5px; margin-bottom: 8px;">${newText}</div>
+                    
+                    <div style="font-weight: 700; color: ${data.new.length > 0 ? 'var(--alert)' : 'var(--safe)'}; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px;">
+                        ${data.new.length > 0 ? '⚠️ Warning: New data types exposed!' : '✅ Safe: No new data types exposed.'}
+                    </div>
+                `;
+                compareResults.innerHTML = html;
+                compareResults.classList.remove('hidden');
+            } catch (e) {
+                compareResults.innerHTML = "<span style='color:var(--alert);'>Error comparing websites.</span>";
+                compareResults.classList.remove('hidden');
+            } finally {
+                compareBtn.disabled = false;
+                compareBtn.textContent = "Compare";
+            }
+        });
+    }
 
     const saveBtn = document.getElementById('save-btn');
     const saveStatus = document.getElementById('save-status');
     
-    saveBtn.addEventListener('click', async () => {
-        if (!currentAnalysisResult) return;
-        
-        saveBtn.disabled = true;
-        saveBtn.textContent = "Saving...";
-        saveStatus.classList.add('hidden');
-        
-        try {
-            const res = await fetch("http://127.0.0.1:5000/api/save-service", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(currentAnalysisResult)
-            });
-
-            if (!res.ok) {
-                let errText = "Failed to save.";
-                try {
-                    const errObj = await res.json();
-                    errText = errObj.error || errText;
-                } catch(e) {}
-                throw new Error(errText);
-            }
-
-            saveBtn.textContent = "Added to Portfolio";
-            saveStatus.textContent = "Successfully saved!";
-            saveStatus.className = "status success";
-            saveStatus.classList.remove('hidden');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            if (!currentAnalysisResult) return;
             
-        } catch (error) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = "Retry Add";
-            saveStatus.textContent = `Error: ${error.message}`;
-            saveStatus.className = "status error";
-            saveStatus.classList.remove('hidden');
-        }
-    });
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+            saveStatus.classList.add('hidden');
+            
+            try {
+                const res = await fetch("http://127.0.0.1:5000/api/save-service", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(currentAnalysisResult)
+                });
+
+                if (!res.ok) {
+                    let errText = "Failed to save.";
+                    try {
+                        const errObj = await res.json();
+                        errText = errObj.error || errText;
+                    } catch(e) {}
+                    throw new Error(errText);
+                }
+
+                saveBtn.textContent = "Added to Portfolio";
+                saveStatus.textContent = "Successfully added to portfolio!";
+                saveStatus.className = "status success";
+                saveStatus.classList.remove('hidden');
+                
+            } catch (error) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Retry Add";
+                saveStatus.textContent = `Error: ${error.message}`;
+                saveStatus.className = "status error";
+                saveStatus.classList.remove('hidden');
+            }
+        });
+    }
 });

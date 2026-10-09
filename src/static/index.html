@@ -1,254 +1,793 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClauseGuard Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style type="text/css">
-        #network-graph {
-            width: 100%;
-            height: 300px;
-            border: 1px solid lightgray;
-            background-color: #f9fafb;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClauseGuard Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    :root {
+      --ink: #101820;
+      --ink-2: #3b4652;
+      --ink-3: #6b7683;
+      --desk: #e8ebee;
+      --sheet: #ffffff;
+      --line: #d5dae0;
+      --mark: #ffd84d;          /* highlighter accent */
+      --safe: #137a5a;
+      --safe-bg: #e3f3ed;
+      --alert: #c8321e;
+      --alert-bg: #fbe9e6;
+      --warning: #7a5b00;
+      --warning-bg: #fff1c2;
+      --radius: 6px;
+      --font: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--desk);
+      color: var(--ink);
+      font: 400 15px/1.5 var(--font);
+    }
+    h1, h2, h3, h4, p { margin: 0; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .wrap { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
+
+    /* Top Bar */
+    .bar { background: var(--ink); color: #fff; }
+    .bar .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      gap: 16px;
+    }
+    .brand {
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -.01em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand i {
+      display: block;
+      width: 22px;
+      height: 14px;
+      background: var(--mark);
+      border-radius: 2px;
+    }
+    .top-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: #2b3744;
+      color: #c4ccd4;
+      letter-spacing: .02em;
+    }
+
+    /* Hero / Intro */
+    .intro { padding: 36px 0 24px; }
+    .intro h1 {
+      font-size: clamp(28px, 4.5vw, 44px);
+      line-height: 1.08;
+      font-weight: 800;
+      letter-spacing: -.025em;
+    }
+    .intro p {
+      margin-top: 10px;
+      color: var(--ink-2);
+      max-width: 65ch;
+      font-size: 16px;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--ink-2);
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+      background: var(--sheet);
+      color: var(--ink);
+    }
+    .tab-btn.active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+      box-shadow: 2px 2px 0 var(--mark);
+    }
+
+    /* Sheets / Cards */
+    .sheet {
+      background: var(--sheet);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      position: relative;
+    }
+    .sheet-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      margin-bottom: 4px;
+    }
+    .sheet-sub {
+      color: var(--ink-3);
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .grid-portfolio {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* Big Numerical Callouts */
+    .score-box {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eef0f3;
+    }
+    .score-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 4px;
+    }
+    .big-score {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .big-score b {
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -.03em;
+    }
+    .big-score span {
+      color: var(--ink-3);
+      font-size: 15px;
+    }
+
+    /* Gauge Bar */
+    .gauge {
+      height: 10px;
+      background: #eef0f3;
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+      margin-top: 10px;
+    }
+    .gauge i {
+      position: absolute;
+      inset: 0 auto 0 0;
+      background: var(--ink);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    /* Service List */
+    .svc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+    .svc-item {
+      padding: 14px 16px;
+      background: #fafbfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      transition: border-color 0.15s ease;
+    }
+    .svc-item:hover { border-color: var(--ink-3); }
+    .svc-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .svc-name {
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .svc-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    /* Badges & Chips */
+    .band {
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 12px;
+      letter-spacing: .01em;
+    }
+    .band.Low { background: var(--safe-bg); color: var(--safe); }
+    .band.Moderate { background: var(--warning-bg); color: var(--warning); }
+    .band.High { background: var(--alert-bg); color: var(--alert); }
+
+    .chip {
+      font-size: 12px;
+      padding: 2px 9px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      background: var(--sheet);
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+    .chip.alert {
+      background: var(--alert-bg);
+      border-color: #efc4bd;
+      color: var(--alert);
+      font-weight: 600;
+    }
+    .chip.safe {
+      background: var(--safe-bg);
+      border-color: #b9dfd0;
+      color: var(--safe);
+      font-weight: 600;
+    }
+
+    /* Network Graph */
+    #network-graph {
+      width: 100%;
+      height: 380px;
+      background: #fafbfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    .graph-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+    .graph-legend span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .graph-legend i {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    /* Form Fields & Comparator */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .select-field {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .select-field:focus {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 1px var(--ink);
+      outline: 0;
+    }
+    .btn {
+      background: var(--ink);
+      color: #fff;
+      border: 0;
+      border-radius: var(--radius);
+      padding: 12px 22px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s ease;
+    }
+    .btn:hover { background: #26323f; }
+    .btn:disabled { opacity: .55; cursor: wait; }
+
+    /* Comparison Result Cards */
+    .cand-card {
+      background: #fafbfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .cand-card.highlight {
+      border: 2px solid var(--ink);
+      box-shadow: 4px 4px 0 var(--mark);
+      background: #fff;
+    }
+    .cand-name {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eef0f3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .delta-badge {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+    .delta-badge.pos { background: var(--alert-bg); color: var(--alert); }
+    .delta-badge.zero { background: var(--safe-bg); color: var(--safe); }
+
+    .cand-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-block {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 10px 12px;
+    }
+    .stat-block .lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; }
+    .stat-block .val { font-size: 22px; font-weight: 800; margin-top: 2px; }
+
+    .entity-group { margin-top: 14px; }
+    .entity-group h4 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--ink-2);
+    }
+
+    /* Status & Alerts */
+    .status {
+      display: none;
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background: var(--sheet);
+      border-left: 4px solid var(--ink);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .status.on { display: flex; align-items: center; gap: 10px; }
+    .status.error { border-left-color: var(--alert); background: var(--alert-bg); color: var(--alert); }
+    .status.success { border-left-color: var(--safe); background: var(--safe-bg); color: var(--safe); }
+
+    .empty-state {
+      padding: 30px 20px;
+      text-align: center;
+      color: var(--ink-3);
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2, .grid-portfolio { grid-template-columns: 1fr; }
+      .cand-stats { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans p-6">
-    <div class="max-w-6xl mx-auto">
-        <header class="mb-8 border-b pb-4 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-indigo-700">ClauseGuard</h1>
-                <p class="text-gray-500">Privacy Portfolio Dashboard</p>
-            </div>
-            <div class="text-xs text-gray-400 bg-gray-100 p-2 rounded border">MOCK/DEV MODE COMPATIBLE</div>
-        </header>
+<body>
 
-        <!-- Error Banner -->
-        <div id="error-banner" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            <strong class="font-bold">Error!</strong>
-            <span id="error-message" class="block sm:inline">Something went wrong.</span>
-        </div>
+  <!-- Top Bar -->
+  <header class="bar">
+    <div class="wrap">
+      <div class="brand"><i></i>ClauseGuard</div>
+      <div class="top-badge">MOCK/DEV MODE COMPATIBLE</div>
+    </div>
+  </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Portfolio Section -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Current Portfolio</h2>
-                <div class="mb-4">
-                    <span class="text-sm text-gray-500 uppercase tracking-wide">Portfolio Risk Score</span>
-                    <div id="portfolio-risk" class="text-4xl font-bold text-indigo-600">0.0</div>
-                </div>
-                
-                <h3 class="font-semibold text-lg mt-6 mb-2">Services in Portfolio</h3>
-                <ul id="service-list" class="space-y-3">
-                    <li class="text-gray-500 italic">Loading services...</li>
-                </ul>
-            </div>
+  <main class="wrap" style="padding-bottom: 60px;">
+    <!-- Intro Header -->
+    <section class="intro">
+      <h1>Privacy Portfolio Dashboard</h1>
+      <p>Analyze how digital services contribute to your cumulative data exposure. Compare candidates side by side against your existing footprint.</p>
+    </section>
 
-            <!-- Entities & Overlap Section -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Privacy Entities</h2>
-                <div class="mb-4">
-                    <span class="text-sm text-gray-500 uppercase tracking-wide">Total Entities Tracked</span>
-                    <div id="total-entities" class="text-2xl font-bold text-gray-700">0</div>
-                </div>
-                
-                <h3 class="font-semibold text-lg mt-6 mb-2">Entity Overlap Graph</h3>
-                <div id="network-graph" class="rounded"></div>
-                <div class="mt-2 text-xs text-gray-500">Legend: <span class="text-blue-600 font-bold">Blue</span> = Service, <span class="text-green-600 font-bold">Green</span> = Canonical Entity</div>
-            </div>
-        </div>
-
-        <!-- Candidate Comparator Section (Side-by-side) -->
-        <div class="mt-8 bg-white rounded-lg shadow p-6 border-t-4 border-indigo-500">
-            <h2 class="text-2xl font-semibold mb-4">Two-Service Marginal Risk Comparator</h2>
-            <p class="text-gray-600 mb-4">Evaluate two candidate services independently against the existing portfolio side by side.</p>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Candidate A -->
-                <div class="p-4 border rounded bg-gray-50">
-                    <h3 class="font-bold mb-2">Candidate A</h3>
-                    <select id="cand-a-select" class="block w-full p-2 border rounded border-gray-300 mb-2 bg-white">
-                        <option value="">-- Select --</option>
-                    </select>
-                </div>
-                <!-- Candidate B -->
-                <div class="p-4 border rounded bg-gray-50">
-                    <h3 class="font-bold mb-2">Candidate B</h3>
-                    <select id="cand-b-select" class="block w-full p-2 border rounded border-gray-300 mb-2 bg-white">
-                        <option value="">-- Select --</option>
-                    </select>
-                </div>
-            </div>
-            
-            <button id="compare-btn" class="mt-4 bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition">Compare Services</button>
-
-            <!-- Results Panel (Hidden by default) -->
-            <div id="candidate-results" class="hidden mt-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- Result A -->
-                    <div class="bg-white p-5 rounded shadow-sm border border-gray-200">
-                        <h3 class="text-xl font-bold mb-4 border-b pb-2"><span id="name-a" class="text-indigo-600">Candidate A</span></h3>
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-500 uppercase tracking-wide">Candidate Risk</div>
-                            <div id="risk-a" class="text-3xl font-bold text-gray-800">0.0</div>
-                        </div>
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-500 uppercase tracking-wide">Marginal Risk Delta</div>
-                            <div id="delta-a" class="text-2xl font-bold text-red-600">0.0</div>
-                        </div>
-                        <h4 class="font-semibold text-orange-600 border-b pb-1 mb-2 mt-4 text-sm">Overlapping Entities</h4>
-                        <ul id="overlap-a" class="list-disc pl-5 text-sm space-y-1 mb-4"></ul>
-                        <h4 class="font-semibold text-red-600 border-b pb-1 mb-2 text-sm">Newly Introduced Entities</h4>
-                        <ul id="new-a" class="list-disc pl-5 text-sm space-y-1"></ul>
-                    </div>
-
-                    <!-- Result B -->
-                    <div class="bg-white p-5 rounded shadow-sm border border-gray-200">
-                        <h3 class="text-xl font-bold mb-4 border-b pb-2"><span id="name-b" class="text-indigo-600">Candidate B</span></h3>
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-500 uppercase tracking-wide">Candidate Risk</div>
-                            <div id="risk-b" class="text-3xl font-bold text-gray-800">0.0</div>
-                        </div>
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-500 uppercase tracking-wide">Marginal Risk Delta</div>
-                            <div id="delta-b" class="text-2xl font-bold text-red-600">0.0</div>
-                        </div>
-                        <h4 class="font-semibold text-orange-600 border-b pb-1 mb-2 mt-4 text-sm">Overlapping Entities</h4>
-                        <ul id="overlap-b" class="list-disc pl-5 text-sm space-y-1 mb-4"></ul>
-                        <h4 class="font-semibold text-red-600 border-b pb-1 mb-2 text-sm">Newly Introduced Entities</h4>
-                        <ul id="new-b" class="list-disc pl-5 text-sm space-y-1"></ul>
-                    </div>
-
-                </div>
-            </div>
-        </div>
+    <!-- Error / Notification Banner -->
+    <div id="status-banner" class="status" role="alert">
+      <span id="status-text"></span>
     </div>
 
-    <script>
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs" role="tablist">
+      <button class="tab-btn active" id="tab-portfolio-btn" onclick="switchTab('portfolio')">Portfolio & Overlap Graph</button>
+      <button class="tab-btn" id="tab-comparator-btn" onclick="switchTab('comparator')">Two-Service Marginal Comparator</button>
+    </div>
 
-        function showError(msg) {
-            document.getElementById('error-message').innerText = msg;
-            document.getElementById('error-banner').classList.remove('hidden');
-        }
-        function hideError() { document.getElementById('error-banner').classList.add('hidden'); }
+    <!-- VIEW 1: Portfolio & Overlap Graph -->
+    <div id="view-portfolio">
+      <div class="grid-portfolio">
+        <!-- Current Portfolio Sheet -->
+        <div class="sheet">
+          <h2 class="sheet-title">Current Portfolio</h2>
+          <p class="sheet-sub">Persisted services and cumulative risk score.</p>
 
-        async function loadPortfolio() {
-            try {
-                const response = await fetch('/api/portfolio');
-                if (!response.ok) throw new Error('Failed to load portfolio');
-                const data = await response.json();
-                renderPortfolio(data);
-                loadGraph();
-            } catch (error) { showError(error.message); }
-        }
+          <div class="score-box">
+            <div class="score-label">Portfolio Risk Score</div>
+            <div class="big-score">
+              <b id="portfolio-risk">0.0</b>
+              <span>cumulative score</span>
+            </div>
+            <div class="gauge"><i id="portfolio-gauge-fill" style="width: 0%;"></i></div>
+          </div>
 
-        async function loadGraph() {
-            try {
-                const response = await fetch('/api/overlap-graph');
-                if (!response.ok) throw new Error('Failed to load graph data');
-                const data = await response.json();
-                
-                // Vis.js dataset conversion
-                const visNodes = new vis.DataSet(
-                    data.nodes.map(n => ({
-                        id: n.id, 
-                        label: n.id, 
-                        color: n.group === 'service' ? '#93c5fd' : '#bbf7d0', // blue for service, green for entity
-                        shape: n.group === 'service' ? 'box' : 'ellipse'
-                    }))
-                );
-                const visEdges = new vis.DataSet(
-                    data.edges.map(e => ({ from: e.source, to: e.target }))
-                );
-                
-                document.getElementById('total-entities').innerText = data.nodes.filter(n => n.group==='entity').length;
+          <h3 style="font-size: 16px; font-weight: 700; margin: 16px 0 10px;">Services in Portfolio</h3>
+          <ul id="service-list" class="svc-list">
+            <li class="empty-state">Loading portfolio services...</li>
+          </ul>
+        </div>
 
-                const container = document.getElementById('network-graph');
-                const graphData = { nodes: visNodes, edges: visEdges };
-                const options = { physics: { stabilization: true } };
-                new vis.Network(container, graphData, options);
+        <!-- Privacy Entities & Overlap Graph Sheet -->
+        <div class="sheet">
+          <h2 class="sheet-title">Privacy Entities</h2>
+          <p class="sheet-sub">Canonical entities extracted across your portfolio.</p>
 
-            } catch(e) { console.error("Graph error", e); }
-        }
+          <div class="score-box">
+            <div class="score-label">Total Unique Entities</div>
+            <div class="big-score">
+              <b id="total-entities">0</b>
+              <span>tracked types</span>
+            </div>
+          </div>
 
-        function renderPortfolio(data) {
-            document.getElementById('portfolio-risk').innerText = data.portfolio_score.toFixed(1);
-            const serviceList = document.getElementById('service-list');
-            serviceList.innerHTML = '';
+          <h3 style="font-size: 16px; font-weight: 700; margin: 16px 0 10px;">Entity Overlap Graph</h3>
+          <div id="network-graph"></div>
+          <div class="graph-legend">
+            <span><i style="background: var(--ink);"></i> Service</span>
+            <span><i style="background: var(--mark);"></i> Canonical Entity</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: Two-Service Marginal Risk Comparator -->
+    <div id="view-comparator" style="display: none;">
+      <div class="sheet">
+        <h2 class="sheet-title">Two-Service Marginal Risk Comparator</h2>
+        <p class="sheet-sub">Select two candidate services from the portfolio or candidate pool to evaluate their marginal risk impact side by side.</p>
+
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <div class="form-group">
+            <label for="cand-a-select">Candidate A</label>
+            <select id="cand-a-select" class="select-field">
+              <option value="">-- Select Candidate A --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cand-b-select">Candidate B</label>
+            <select id="cand-b-select" class="select-field">
+              <option value="">-- Select Candidate B --</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="compare-btn" class="btn">Compare Candidates</button>
+
+        <!-- Side-by-Side Comparison Results -->
+        <div id="candidate-results" style="display: none; margin-top: 28px;">
+          <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 16px;">Marginal Evaluation Results</h3>
+          <div class="grid-2">
             
-            const candA = document.getElementById('cand-a-select');
-            const candB = document.getElementById('cand-b-select');
-            candA.innerHTML = '<option value="">-- Select --</option>';
-            candB.innerHTML = '<option value="">-- Select --</option>';
+            <!-- Result A -->
+            <div class="cand-card" id="card-a">
+              <div class="cand-name">
+                <span id="name-a">Candidate A</span>
+                <span id="badge-a" class="delta-badge zero">+0.0 Δ</span>
+              </div>
+              <div class="cand-stats">
+                <div class="stat-block">
+                  <div class="lbl">Candidate Risk</div>
+                  <div class="val" id="risk-a">0.0</div>
+                </div>
+                <div class="stat-block">
+                  <div class="lbl">Marginal Delta</div>
+                  <div class="val" id="delta-a">0.0</div>
+                </div>
+              </div>
+              <div class="entity-group">
+                <h4>Overlapping Entities</h4>
+                <div id="overlap-a" class="svc-chips"></div>
+              </div>
+              <div class="entity-group">
+                <h4>Newly Introduced Entities</h4>
+                <div id="new-a" class="svc-chips"></div>
+              </div>
+            </div>
 
-            if (data.services.length === 0) {
-                serviceList.innerHTML = '<li class="text-gray-500 italic">Portfolio is empty.</li>';
-                candA.innerHTML = '<option value="">-- No Services Available --</option>';
-                candB.innerHTML = '<option value="">-- No Services Available --</option>';
-            } else {
-                data.services.forEach(s => {
-                    serviceList.innerHTML += `<li class="bg-gray-50 p-3 rounded border border-gray-200">
-                        <div class="flex justify-between items-center">
-                            <strong class="text-lg">${s.service_name}</strong>
-                            <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">Risk: ${s.service_score.toFixed(1)}</span>
-                        </div>
-                        <div class="text-sm text-gray-600">Entities: ${s.entities.length}</div>
-                    </li>`;
-                    
-                    candA.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
-                    candB.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
-                });
-            }
-        }
+            <!-- Result B -->
+            <div class="cand-card" id="card-b">
+              <div class="cand-name">
+                <span id="name-b">Candidate B</span>
+                <span id="badge-b" class="delta-badge zero">+0.0 Δ</span>
+              </div>
+              <div class="cand-stats">
+                <div class="stat-block">
+                  <div class="lbl">Candidate Risk</div>
+                  <div class="val" id="risk-b">0.0</div>
+                </div>
+                <div class="stat-block">
+                  <div class="lbl">Marginal Delta</div>
+                  <div class="val" id="delta-b">0.0</div>
+                </div>
+              </div>
+              <div class="entity-group">
+                <h4>Overlapping Entities</h4>
+                <div id="overlap-b" class="svc-chips"></div>
+              </div>
+              <div class="entity-group">
+                <h4>Newly Introduced Entities</h4>
+                <div id="new-b" class="svc-chips"></div>
+              </div>
+            </div>
 
-        function renderCandidateResult(suffix, data) {
-            document.getElementById(`name-${suffix}`).innerText = data.candidate_name;
-            document.getElementById(`risk-${suffix}`).innerText = data.candidate_service_risk.toFixed(1);
-            document.getElementById(`delta-${suffix}`).innerText = data.marginal_risk_delta.toFixed(1);
-            
-            const ulOverlap = document.getElementById(`overlap-${suffix}`);
-            ulOverlap.innerHTML = data.overlapping_entities.length ? 
-                data.overlapping_entities.map(e => `<li>${e}</li>`).join('') : '<li class="text-gray-400 italic">None</li>';
-            
-            const ulNew = document.getElementById(`new-${suffix}`);
-            ulNew.innerHTML = data.newly_introduced_entities.length ? 
-                data.newly_introduced_entities.map(e => `<li>${e}</li>`).join('') : '<li class="text-gray-400 italic">None</li>';
-        }
+          </div>
+        </div>
+      </div>
+    </div>
 
-        document.getElementById('compare-btn').addEventListener('click', async () => {
-            hideError();
-            const valA = document.getElementById('cand-a-select').value;
-            const valB = document.getElementById('cand-b-select').value;
-            
-            if (!valA || !valB) {
-                showError("Please select both candidates.");
-                return;
-            }
+  </main>
 
-            try {
-                const response = await fetch('/api/compare-services', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        candidate_a: valA,
-                        candidate_b: valB
-                    })
-                });
-                
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Comparison failed');
-                
-                renderCandidateResult('a', result.candidate_a);
-                renderCandidateResult('b', result.candidate_b);
-                
-                document.getElementById('candidate-results').classList.remove('hidden');
-            } catch (error) { showError(error.message); }
+  <script>
+    "use strict";
+
+    function showStatus(msg, isError = false) {
+      const banner = document.getElementById('status-banner');
+      const text = document.getElementById('status-text');
+      banner.className = `status on ${isError ? 'error' : 'success'}`;
+      text.textContent = msg;
+    }
+
+    function hideStatus() {
+      const banner = document.getElementById('status-banner');
+      banner.className = 'status';
+    }
+
+    function switchTab(tab) {
+      const pTab = document.getElementById('view-portfolio');
+      const cTab = document.getElementById('view-comparator');
+      const pBtn = document.getElementById('tab-portfolio-btn');
+      const cBtn = document.getElementById('tab-comparator-btn');
+
+      if (tab === 'portfolio') {
+        pTab.style.display = 'block';
+        cTab.style.display = 'none';
+        pBtn.classList.add('active');
+        cBtn.classList.remove('active');
+      } else {
+        pTab.style.display = 'none';
+        cTab.style.display = 'block';
+        pBtn.classList.remove('active');
+        cBtn.classList.add('active');
+      }
+    }
+
+    async function loadPortfolio() {
+      try {
+        const response = await fetch('/api/portfolio');
+        if (!response.ok) throw new Error('Failed to load portfolio database.');
+        const data = await response.json();
+        renderPortfolio(data);
+        loadGraph();
+      } catch (error) {
+        showStatus(error.message, true);
+      }
+    }
+
+    async function loadGraph() {
+      try {
+        const response = await fetch('/api/overlap-graph');
+        if (!response.ok) throw new Error('Failed to load graph data.');
+        const data = await response.json();
+
+        // Stylized nodes matching the reference design palette
+        const visNodes = new vis.DataSet(
+          data.nodes.map(n => ({
+            id: n.id,
+            label: n.id,
+            color: n.group === 'service' ? { background: '#101820', border: '#101820', highlight: { background: '#26323f', border: '#101820' } }
+                                        : { background: '#ffd84d', border: '#101820', highlight: { background: '#ffe480', border: '#101820' } },
+            font: { color: n.group === 'service' ? '#ffffff' : '#101820', face: 'Schibsted Grotesk', size: 13, bold: true },
+            shape: n.group === 'service' ? 'box' : 'ellipse',
+            margin: 10,
+            borderWidth: 1.5
+          }))
+        );
+
+        const visEdges = new vis.DataSet(
+          data.edges.map(e => ({
+            from: e.source,
+            to: e.target,
+            color: { color: '#d5dae0', highlight: '#101820' },
+            width: 1.5
+          }))
+        );
+
+        const entityCount = data.nodes.filter(n => n.group === 'entity').length;
+        document.getElementById('total-entities').innerText = entityCount;
+
+        const container = document.getElementById('network-graph');
+        const graphData = { nodes: visNodes, edges: visEdges };
+        const options = {
+          physics: {
+            stabilization: true,
+            barnesHut: { gravitationalConstant: -3000, springLength: 95 }
+          },
+          interaction: { hover: true, zoomView: true }
+        };
+        new vis.Network(container, graphData, options);
+
+      } catch (e) {
+        console.error("Graph render error:", e);
+      }
+    }
+
+    function getRiskBand(score) {
+      if (score < 15) return "Low";
+      if (score < 30) return "Moderate";
+      return "High";
+    }
+
+    function renderPortfolio(data) {
+      const score = data.portfolio_score || 0;
+      document.getElementById('portfolio-risk').innerText = score.toFixed(1);
+      
+      const gaugePercent = Math.min(100, Math.round((score / 50) * 100));
+      document.getElementById('portfolio-gauge-fill').style.width = `${gaugePercent}%`;
+
+      const serviceList = document.getElementById('service-list');
+      serviceList.innerHTML = '';
+
+      const candA = document.getElementById('cand-a-select');
+      const candB = document.getElementById('cand-b-select');
+      candA.innerHTML = '<option value="">-- Select Candidate A --</option>';
+      candB.innerHTML = '<option value="">-- Select Candidate B --</option>';
+
+      if (!data.services || data.services.length === 0) {
+        serviceList.innerHTML = '<li class="empty-state">No services stored in portfolio yet.</li>';
+        candA.innerHTML = '<option value="">-- No Services Available --</option>';
+        candB.innerHTML = '<option value="">-- No Services Available --</option>';
+      } else {
+        data.services.forEach(s => {
+          const sRisk = s.service_score || 0;
+          const band = getRiskBand(sRisk);
+          const entChips = s.entities.map(e => `<span class="chip">${e}</span>`).join('');
+
+          const li = document.createElement('li');
+          li.className = 'svc-item';
+          li.innerHTML = `
+            <div class="svc-head">
+              <span class="svc-name">${s.service_name}</span>
+              <span class="band ${band}">Score: ${sRisk.toFixed(1)} (${band})</span>
+            </div>
+            <div class="svc-chips">${entChips}</div>
+          `;
+          serviceList.appendChild(li);
+
+          candA.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
+          candB.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
+        });
+      }
+    }
+
+    function renderCandidateResult(suffix, data) {
+      document.getElementById(`name-${suffix}`).innerText = data.candidate_name;
+      document.getElementById(`risk-${suffix}`).innerText = data.candidate_service_risk.toFixed(1);
+      
+      const delta = data.marginal_risk_delta || 0;
+      document.getElementById(`delta-${suffix}`).innerText = delta.toFixed(1);
+
+      const badge = document.getElementById(`badge-${suffix}`);
+      badge.innerText = `+${delta.toFixed(1)} Δ`;
+      badge.className = `delta-badge ${delta > 0 ? 'pos' : 'zero'}`;
+
+      const overlapDiv = document.getElementById(`overlap-${suffix}`);
+      if (data.overlapping_entities && data.overlapping_entities.length) {
+        overlapDiv.innerHTML = data.overlapping_entities.map(e => `<span class="chip safe">${e}</span>`).join('');
+      } else {
+        overlapDiv.innerHTML = '<span class="chip">None</span>';
+      }
+
+      const newDiv = document.getElementById(`new-${suffix}`);
+      if (data.newly_introduced_entities && data.newly_introduced_entities.length) {
+        newDiv.innerHTML = data.newly_introduced_entities.map(e => `<span class="chip alert">⚠️ ${e}</span>`).join('');
+      } else {
+        newDiv.innerHTML = '<span class="chip safe">✅ No new exposure</span>';
+      }
+    }
+
+    document.getElementById('compare-btn').addEventListener('click', async () => {
+      hideStatus();
+      const valA = document.getElementById('cand-a-select').value;
+      const valB = document.getElementById('cand-b-select').value;
+
+      if (!valA || !valB) {
+        showStatus("Please select both candidates to compare.", true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/compare-services', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidate_a: valA,
+            candidate_b: valB
+          })
         });
 
-        loadPortfolio();
-    </script>
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Comparison failed.');
+
+        renderCandidateResult('a', result.candidate_a);
+        renderCandidateResult('b', result.candidate_b);
+
+        // Highlight the safer candidate (lower delta)
+        const cardA = document.getElementById('card-a');
+        const cardB = document.getElementById('card-b');
+        cardA.classList.remove('highlight');
+        cardB.classList.remove('highlight');
+
+        if (result.candidate_a.marginal_risk_delta < result.candidate_b.marginal_risk_delta) {
+          cardA.classList.add('highlight');
+        } else if (result.candidate_b.marginal_risk_delta < result.candidate_a.marginal_risk_delta) {
+          cardB.classList.add('highlight');
+        }
+
+        document.getElementById('candidate-results').style.display = 'block';
+      } catch (error) {
+        showStatus(error.message, true);
+      }
+    });
+
+    loadPortfolio();
+  </script>
 </body>
 </html>

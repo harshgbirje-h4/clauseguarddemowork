@@ -1,66 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ClauseGuard</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="header">
-    <h1>ClauseGuard</h1>
-    <p>Privacy Policy Analyzer</p>
-  </div>
-  
-  <div class="content">
-    <div id="website-info">
-      <strong>Website:</strong> <span id="site-name">Loading...</span>
+  <!-- Header Bar -->
+  <header class="top">
+    <div class="brand"><i></i>ClauseGuard</div>
+    <div class="top-r">
+      <span id="api-mode" class="conn">MOCK/DEV</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Target Website Header -->
+    <div class="site">
+      <span class="lbl">Website:</span>
+      <span id="site-name">Loading...</span>
     </div>
 
+    <!-- Analyze Button -->
     <button id="analyze-btn" class="btn">Analyze Policy</button>
+    <p class="hint" id="analyze-hint">Scans page text and evaluates privacy exposure.</p>
 
-    <div id="status" class="status hidden"></div>
+    <!-- Status / Notification Banner -->
+    <div id="status" class="status hidden" role="status" aria-live="polite"></div>
 
+    <!-- Analysis Results Section -->
     <div id="results" class="hidden">
-      <div class="risk-section">
-        <h3>Privacy Risk</h3>
-        <div id="risk-score" class="risk-score">0.0</div>
-      </div>
       
-      <div class="mode-indicator" id="mode-indicator">
-        Mode: <span id="api-mode">UNKNOWN</span>
-      </div>
-
-      <div class="entities-section">
-        <h3>Detected Data:</h3>
-        <ul id="entities-list"></ul>
-      </div>
-
-      <div class="clauses-summary">
-        <p>Clauses extracted: <span id="clause-count">0</span></p>
-        <button id="toggle-clauses-btn" class="btn-small">View Details</button>
-      </div>
-
-      <div id="clauses-details" class="hidden">
-        <!-- Clauses injected here -->
-      </div>
-      
-      <div class="compare-section" id="compare-section" class="hidden" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: none;">
-        <h3 style="font-size: 13px; color: #475569; margin-bottom: 8px;">Compare against saved website:</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <select id="compare-target" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; color: #334155;">
-                <option value="">-- Select website --</option>
-            </select>
-            <button id="compare-btn" class="btn-small" style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer;">Compare</button>
+      <!-- Score & Gauge Card -->
+      <div class="card score">
+        <div class="score-head">
+          <div>
+            <b id="risk-score">0.0</b>
+            <span>risk score</span>
+          </div>
+          <span id="risk-band" class="band Low">Low</span>
         </div>
-        <div id="compare-results" class="hidden" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #334155; line-height: 1.5;"></div>
+        <div class="gauge"><i id="gauge-fill" style="width: 0%;"></i></div>
+        <div class="meta-row">
+          <span>Mode: <b id="mode-text">MOCK/DEV</b></span>
+          <span>Clauses: <b id="clause-count">0</b></span>
+        </div>
       </div>
-      
-      <div class="save-section" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+
+      <!-- Detected Entities Section -->
+      <div class="card section-card">
+        <h3>Detected Data Types</h3>
+        <div id="entities-list" class="chips">
+          <span class="chip">None detected</span>
+        </div>
+      </div>
+
+      <!-- Extracted Clauses Section -->
+      <div class="card section-card">
+        <div class="clauses-head">
+          <h3>Riskiest Clauses</h3>
+          <button id="toggle-clauses-btn" class="btn-link">View Details</button>
+        </div>
+        <div id="clauses-details" class="hidden">
+          <!-- Clause cards injected here -->
+        </div>
+      </div>
+
+      <!-- Quick Comparison Card -->
+      <div class="card compare" id="compare-section" style="display: none;">
+        <h3>Compare with Saved Service</h3>
+        <div class="row">
+          <select id="compare-target" class="select-field">
+            <option value="">-- Select website --</option>
+          </select>
+          <button id="compare-btn" class="btn small">Compare</button>
+        </div>
+        <div id="compare-results" class="hidden"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
         <button id="save-btn" class="btn">Add to Portfolio</button>
-        <div id="save-status" class="status hidden" style="margin-top: 10px;"></div>
       </div>
+      <div id="save-status" class="status hidden" role="status"></div>
     </div>
-  </div>
+  </main>
 
   <script src="popup.js"></script>
 </body>

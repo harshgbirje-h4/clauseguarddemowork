@@ -22,6 +22,8 @@
       --alert-bg: #fbe9e6;
       --warning: #7a5b00;
       --warning-bg: #fff1c2;
+      --neutral-bg: #f1f5f9;
+      --neutral-text: #475569;
       --radius: 6px;
       --font: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
@@ -73,27 +75,27 @@
     }
 
     /* Hero / Intro */
-    .intro { padding: 36px 0 24px; }
+    .intro { padding: 32px 0 20px; }
     .intro h1 {
-      font-size: clamp(28px, 4.5vw, 44px);
-      line-height: 1.08;
+      font-size: clamp(26px, 4vw, 40px);
+      line-height: 1.1;
       font-weight: 800;
       letter-spacing: -.025em;
     }
     .intro p {
-      margin-top: 10px;
+      margin-top: 8px;
       color: var(--ink-2);
-      max-width: 65ch;
-      font-size: 16px;
+      max-width: 68ch;
+      font-size: 15.5px;
     }
 
     /* Navigation Tabs */
     .nav-tabs {
       display: flex;
       gap: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
       border-bottom: 1px solid var(--line);
-      padding-bottom: 12px;
+      padding-bottom: 10px;
     }
     .tab-btn {
       background: transparent;
@@ -101,7 +103,7 @@
       border-radius: var(--radius);
       padding: 8px 16px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13.5px;
       cursor: pointer;
       color: var(--ink-2);
       transition: all 0.15s ease;
@@ -122,8 +124,9 @@
       background: var(--sheet);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: 22px 24px;
       position: relative;
+      margin-bottom: 20px;
     }
     .sheet-title {
       font-size: 20px;
@@ -135,6 +138,7 @@
       color: var(--ink-3);
       font-size: 14px;
       margin-bottom: 18px;
+      line-height: 1.45;
     }
 
     /* Grid Layouts */
@@ -146,19 +150,19 @@
     }
     .grid-portfolio {
       display: grid;
-      grid-template-columns: 1fr 1.15fr;
+      grid-template-columns: 1fr 1.1fr;
       gap: 20px;
       align-items: start;
     }
 
     /* Big Numerical Callouts */
     .score-box {
-      margin-bottom: 20px;
-      padding-bottom: 16px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
       border-bottom: 1px solid #eef0f3;
     }
     .score-label {
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 700;
       color: var(--ink-3);
       text-transform: uppercase;
@@ -168,22 +172,33 @@
     .big-score {
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 6px;
     }
     .big-score b {
-      font-size: 52px;
+      font-size: 48px;
       line-height: 1;
       font-weight: 800;
       letter-spacing: -.03em;
     }
-    .big-score span {
+    .big-score .denom {
+      font-size: 18px;
+      font-weight: 700;
       color: var(--ink-3);
-      font-size: 15px;
+    }
+    .big-score .score-tag {
+      margin-left: 8px;
+      font-size: 14px;
+      color: var(--ink-3);
+    }
+    .additive-note {
+      font-size: 12.5px;
+      color: var(--ink-3);
+      margin-top: 6px;
     }
 
     /* Gauge Bar */
     .gauge {
-      height: 10px;
+      height: 9px;
       background: #eef0f3;
       border-radius: 3px;
       overflow: hidden;
@@ -207,7 +222,7 @@
       gap: 10px;
     }
     .svc-item {
-      padding: 14px 16px;
+      padding: 12px 14px;
       background: #fafbfc;
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -222,7 +237,7 @@
     }
     .svc-name {
       font-weight: 700;
-      font-size: 16px;
+      font-size: 15px;
     }
     .svc-chips {
       display: flex;
@@ -236,16 +251,18 @@
       font-weight: 700;
       padding: 3px 9px;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11.5px;
       letter-spacing: .01em;
     }
     .band.Low { background: var(--safe-bg); color: var(--safe); }
     .band.Moderate { background: var(--warning-bg); color: var(--warning); }
     .band.High { background: var(--alert-bg); color: var(--alert); }
+    .band.VeryHigh, .band.Very { background: var(--alert-bg); color: var(--alert); font-weight: 800; }
+    .band.Inconclusive { background: var(--neutral-bg); color: var(--neutral-text); }
 
     .chip {
-      font-size: 12px;
-      padding: 2px 9px;
+      font-size: 11.5px;
+      padding: 2px 8px;
       border: 1px solid var(--line);
       border-radius: 99px;
       background: var(--sheet);
@@ -263,6 +280,38 @@
       border-color: #b9dfd0;
       color: var(--safe);
       font-weight: 600;
+    }
+
+    /* Exposure Ledger Table (Problem 6) */
+    .ledger-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 13.5px;
+    }
+    .ledger-table th {
+      text-align: left;
+      padding: 9px 12px;
+      background: #f8fafc;
+      border-bottom: 2px solid var(--ink);
+      font-weight: 700;
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .ledger-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .ledger-table tr:hover td {
+      background: #fafbfc;
+    }
+    .ledger-disclaimer {
+      font-size: 12px;
+      color: var(--ink-3);
+      font-style: italic;
+      margin-top: 12px;
+      line-height: 1.4;
     }
 
     /* Network Graph */
@@ -297,31 +346,36 @@
     .form-group label {
       display: block;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13.5px;
       margin-bottom: 6px;
     }
-    .select-field {
+    .select-field, .input-field, .textarea-field {
       width: 100%;
-      padding: 10px 12px;
+      padding: 9px 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: #fff;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 500;
     }
-    .select-field:focus {
+    .select-field:focus, .input-field:focus, .textarea-field:focus {
       border-color: var(--ink);
       box-shadow: 0 0 0 1px var(--ink);
       outline: 0;
+    }
+    .textarea-field {
+      resize: vertical;
+      min-height: 120px;
+      font-family: inherit;
     }
     .btn {
       background: var(--ink);
       color: #fff;
       border: 0;
       border-radius: var(--radius);
-      padding: 12px 22px;
+      padding: 10px 20px;
       font-weight: 700;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -330,13 +384,19 @@
     }
     .btn:hover { background: #26323f; }
     .btn:disabled { opacity: .55; cursor: wait; }
+    .btn.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+    .btn.ghost:hover { background: var(--ink); color: #fff; }
 
     /* Comparison Result Cards */
     .cand-card {
       background: #fafbfc;
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: 20px;
+      padding: 18px;
     }
     .cand-card.highlight {
       border: 2px solid var(--ink);
@@ -344,19 +404,19 @@
       background: #fff;
     }
     .cand-name {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 800;
       margin-bottom: 12px;
-      padding-bottom: 10px;
+      padding-bottom: 8px;
       border-bottom: 1px solid #eef0f3;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .delta-badge {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
-      padding: 3px 10px;
+      padding: 3px 9px;
       border-radius: 4px;
     }
     .delta-badge.pos { background: var(--alert-bg); color: var(--alert); }
@@ -366,46 +426,58 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .stat-block {
       background: #fff;
       border: 1px solid var(--line);
       border-radius: 4px;
-      padding: 10px 12px;
+      padding: 8px 12px;
     }
     .stat-block .lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; }
-    .stat-block .val { font-size: 22px; font-weight: 800; margin-top: 2px; }
+    .stat-block .val { font-size: 20px; font-weight: 800; margin-top: 2px; }
 
-    .entity-group { margin-top: 14px; }
+    .entity-group { margin-top: 12px; }
     .entity-group h4 {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       margin-bottom: 6px;
       color: var(--ink-2);
     }
 
+    /* Coverage Banner in Scanner */
+    .coverage-card {
+      background: #fafbfc;
+      border: 1px dashed var(--line);
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
     /* Status & Alerts */
     .status {
       display: none;
-      margin-bottom: 20px;
-      padding: 12px 16px;
+      margin-bottom: 18px;
+      padding: 11px 16px;
       background: var(--sheet);
       border-left: 4px solid var(--ink);
       border-radius: var(--radius);
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 500;
     }
     .status.on { display: flex; align-items: center; gap: 10px; }
     .status.error { border-left-color: var(--alert); background: var(--alert-bg); color: var(--alert); }
     .status.success { border-left-color: var(--safe); background: var(--safe-bg); color: var(--safe); }
+    .status.warning { border-left-color: var(--warning); background: var(--warning-bg); color: var(--warning); }
 
     .empty-state {
-      padding: 30px 20px;
+      padding: 24px 20px;
       text-align: center;
       color: var(--ink-3);
       font-style: italic;
-      font-size: 14px;
+      font-size: 13.5px;
     }
 
     @media (max-width: 860px) {
@@ -427,8 +499,8 @@
   <main class="wrap" style="padding-bottom: 60px;">
     <!-- Intro Header -->
     <section class="intro">
-      <h1>Privacy Portfolio Dashboard</h1>
-      <p>Analyze how digital services contribute to your cumulative data exposure. Compare candidates side by side against your existing footprint.</p>
+      <h1>Privacy Portfolio & Exposure Dashboard</h1>
+      <p>Evaluate compounded data exposure across multiple web services. Track canonical permissions, inspect cumulative footprints, and compare candidates.</p>
     </section>
 
     <!-- Error / Notification Banner -->
@@ -438,28 +510,30 @@
 
     <!-- Navigation Tabs -->
     <div class="nav-tabs" role="tablist">
-      <button class="tab-btn active" id="tab-portfolio-btn" onclick="switchTab('portfolio')">Portfolio & Overlap Graph</button>
+      <button class="tab-btn active" id="tab-portfolio-btn" onclick="switchTab('portfolio')">Portfolio & Exposure Ledger</button>
       <button class="tab-btn" id="tab-comparator-btn" onclick="switchTab('comparator')">Two-Service Marginal Comparator</button>
+      <button class="tab-btn" id="tab-scanner-btn" onclick="switchTab('scanner')">Direct Policy Scanner / Manual Input</button>
     </div>
 
-    <!-- VIEW 1: Portfolio & Overlap Graph -->
+    <!-- VIEW 1: Portfolio & Exposure Ledger -->
     <div id="view-portfolio">
       <div class="grid-portfolio">
         <!-- Current Portfolio Sheet -->
         <div class="sheet">
           <h2 class="sheet-title">Current Portfolio</h2>
-          <p class="sheet-sub">Persisted services and cumulative risk score.</p>
+          <p class="sheet-sub">De-duplicated portfolio exposure based on worst-case permissions per data type.</p>
 
           <div class="score-box">
-            <div class="score-label">Portfolio Risk Score</div>
+            <div class="score-label">Portfolio Risk Score (De-duplicated)</div>
             <div class="big-score">
-              <b id="portfolio-risk">0.0</b>
-              <span>cumulative score</span>
+              <b id="portfolio-risk">0.0</b><span class="denom">/ 100</span>
+              <span class="score-tag" id="portfolio-band">Low</span>
             </div>
             <div class="gauge"><i id="portfolio-gauge-fill" style="width: 0%;"></i></div>
+            <div class="additive-note" id="portfolio-sum-note">Additive total (counts shared data multiple times): 0.0</div>
           </div>
 
-          <h3 style="font-size: 16px; font-weight: 700; margin: 16px 0 10px;">Services in Portfolio</h3>
+          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 10px;">Stored Services</h3>
           <ul id="service-list" class="svc-list">
             <li class="empty-state">Loading portfolio services...</li>
           </ul>
@@ -467,18 +541,18 @@
 
         <!-- Privacy Entities & Overlap Graph Sheet -->
         <div class="sheet">
-          <h2 class="sheet-title">Privacy Entities</h2>
-          <p class="sheet-sub">Canonical entities extracted across your portfolio.</p>
+          <h2 class="sheet-title">Privacy Entities & Overlap</h2>
+          <p class="sheet-sub">Canonical entities mapped across your portfolio services.</p>
 
           <div class="score-box">
-            <div class="score-label">Total Unique Entities</div>
+            <div class="score-label">Total Unique Data Types</div>
             <div class="big-score">
               <b id="total-entities">0</b>
-              <span>tracked types</span>
+              <span class="denom">types</span>
             </div>
           </div>
 
-          <h3 style="font-size: 16px; font-weight: 700; margin: 16px 0 10px;">Entity Overlap Graph</h3>
+          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 10px;">Entity Overlap Graph</h3>
           <div id="network-graph"></div>
           <div class="graph-legend">
             <span><i style="background: var(--ink);"></i> Service</span>
@@ -486,13 +560,40 @@
           </div>
         </div>
       </div>
+
+      <!-- Privacy Exposure Ledger (Problem 6 & 7) -->
+      <div class="sheet" style="margin-top: 10px;">
+        <h2 class="sheet-title">Privacy Exposure Ledger</h2>
+        <p class="sheet-sub">Every canonical data type collected across your portfolio is listed once below, alongside the services that request it and the highest-severity clause.</p>
+
+        <div style="overflow-x: auto;">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">Data Category</th>
+                <th style="width: 14%;">Exposure Risk</th>
+                <th style="width: 28%;">Services Collecting</th>
+                <th style="width: 36%;">Worst-Case Clause Excerpt</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body">
+              <tr>
+                <td colspan="4" class="empty-state">Loading ledger...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ledger-disclaimer">
+          Note: This ledger highlights permissions you have granted across all stored accounts. It illustrates cumulative exposure and does not imply that these companies share data with one another.
+        </p>
+      </div>
     </div>
 
     <!-- VIEW 2: Two-Service Marginal Risk Comparator -->
     <div id="view-comparator" style="display: none;">
       <div class="sheet">
         <h2 class="sheet-title">Two-Service Marginal Risk Comparator</h2>
-        <p class="sheet-sub">Select two candidate services from the portfolio or candidate pool to evaluate their marginal risk impact side by side.</p>
+        <p class="sheet-sub">Evaluate two candidate services side by side against your portfolio footprint to see which introduces less new risk.</p>
 
         <div class="grid-2" style="margin-bottom: 20px;">
           <div class="form-group">
@@ -512,8 +613,8 @@
         <button id="compare-btn" class="btn">Compare Candidates</button>
 
         <!-- Side-by-Side Comparison Results -->
-        <div id="candidate-results" style="display: none; margin-top: 28px;">
-          <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 16px;">Marginal Evaluation Results</h3>
+        <div id="candidate-results" style="display: none; margin-top: 26px;">
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 14px;">Marginal Evaluation Results</h3>
           <div class="grid-2">
             
             <!-- Result A -->
@@ -573,10 +674,68 @@
       </div>
     </div>
 
+    <!-- VIEW 3: Direct Policy Scanner / Manual Input (Problem 1 & 5) -->
+    <div id="view-scanner" style="display: none;">
+      <div class="sheet">
+        <h2 class="sheet-title">Direct Policy Scanner & Manual Input</h2>
+        <p class="sheet-sub">Scan a policy directly by URL or paste text manually if web protections block automated extraction.</p>
+
+        <div class="form-group">
+          <label for="scan-url">Service / Policy URL (Optional)</label>
+          <input type="text" id="scan-url" class="input-field" placeholder="https://example.com/privacy">
+        </div>
+
+        <div class="form-group">
+          <label for="scan-text">Privacy Policy Text</label>
+          <textarea id="scan-text" class="textarea-field" placeholder="Paste the privacy policy text here..."></textarea>
+        </div>
+
+        <button id="direct-scan-btn" class="btn">Analyze Policy</button>
+
+        <!-- Direct Scan Results -->
+        <div id="scan-results" style="display: none; margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px;">
+          <div class="score-head" style="margin-bottom: 12px;">
+            <div>
+              <span id="scan-service-name" style="font-size: 20px; font-weight: 800;">Analyzed Service</span>
+              <div class="big-score" style="margin-top: 4px;">
+                <b id="scan-score">0</b><span class="denom">/ 100</span>
+                <span class="score-tag" id="scan-band">Low</span>
+              </div>
+            </div>
+            <button id="scan-save-btn" class="btn small">Add to Portfolio</button>
+          </div>
+
+          <div class="gauge" style="margin-bottom: 16px;"><i id="scan-gauge-fill" style="width: 0%;"></i></div>
+
+          <!-- Coverage Display -->
+          <div id="scan-coverage" class="coverage-card"></div>
+
+          <!-- Main Drivers -->
+          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 8px;">Top Risk Clauses</h3>
+          <div id="scan-top-clauses" style="display: grid; gap: 8px;"></div>
+
+          <!-- Detected Entities -->
+          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 8px;">Detected Data Types</h3>
+          <div id="scan-entities" class="svc-chips"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
     "use strict";
+
+    let lastScanData = null;
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function showStatus(msg, isError = false) {
       const banner = document.getElementById('status-banner');
@@ -593,20 +752,25 @@
     function switchTab(tab) {
       const pTab = document.getElementById('view-portfolio');
       const cTab = document.getElementById('view-comparator');
+      const sTab = document.getElementById('view-scanner');
       const pBtn = document.getElementById('tab-portfolio-btn');
       const cBtn = document.getElementById('tab-comparator-btn');
+      const sBtn = document.getElementById('tab-scanner-btn');
 
-      if (tab === 'portfolio') {
-        pTab.style.display = 'block';
-        cTab.style.display = 'none';
-        pBtn.classList.add('active');
-        cBtn.classList.remove('active');
-      } else {
-        pTab.style.display = 'none';
-        cTab.style.display = 'block';
-        pBtn.classList.remove('active');
-        cBtn.classList.add('active');
-      }
+      pTab.style.display = tab === 'portfolio' ? 'block' : 'none';
+      cTab.style.display = tab === 'comparator' ? 'block' : 'none';
+      sTab.style.display = tab === 'scanner' ? 'block' : 'none';
+
+      pBtn.classList.toggle('active', tab === 'portfolio');
+      cBtn.classList.toggle('active', tab === 'comparator');
+      sBtn.classList.toggle('active', tab === 'scanner');
+    }
+
+    function getRiskBand(score) {
+      if (score >= 75) return "VeryHigh";
+      if (score >= 50) return "High";
+      if (score >= 25) return "Moderate";
+      return "Low";
     }
 
     async function loadPortfolio() {
@@ -615,6 +779,7 @@
         if (!response.ok) throw new Error('Failed to load portfolio database.');
         const data = await response.json();
         renderPortfolio(data);
+        renderLedger(data);
         loadGraph();
       } catch (error) {
         showStatus(error.message, true);
@@ -669,18 +834,24 @@
       }
     }
 
-    function getRiskBand(score) {
-      if (score < 15) return "Low";
-      if (score < 30) return "Moderate";
-      return "High";
-    }
-
     function renderPortfolio(data) {
-      const score = data.portfolio_score || 0;
-      document.getElementById('portfolio-risk').innerText = score.toFixed(1);
+      // De-duplicated headline score
+      const headline = data.portfolio_risk_0_100 ?? data.portfolio_score ?? 0;
+      const scoreNum = Number(headline);
+      document.getElementById('portfolio-risk').innerText = scoreNum.toFixed(1);
       
-      const gaugePercent = Math.min(100, Math.round((score / 50) * 100));
-      document.getElementById('portfolio-gauge-fill').style.width = `${gaugePercent}%`;
+      const band = getRiskBand(scoreNum);
+      const bandEl = document.getElementById('portfolio-band');
+      bandEl.innerText = band === "VeryHigh" ? "Very High" : band;
+      bandEl.className = `band ${band}`;
+
+      const pct = Math.min(100, Math.max(0, Math.round(scoreNum)));
+      document.getElementById('portfolio-gauge-fill').style.width = `${pct}%`;
+
+      const sumEl = document.getElementById('portfolio-sum-note');
+      if (sumEl) {
+        sumEl.innerText = `Additive total (counts shared data multiple times across services): ${Number(data.portfolio_score || 0).toFixed(1)}`;
+      }
 
       const serviceList = document.getElementById('service-list');
       serviceList.innerHTML = '';
@@ -697,24 +868,55 @@
       } else {
         data.services.forEach(s => {
           const sRisk = s.service_score || 0;
-          const band = getRiskBand(sRisk);
-          const entChips = s.entities.map(e => `<span class="chip">${e}</span>`).join('');
+          const sBand = getRiskBand(sRisk);
+          const entChips = (s.entities || []).map(e => `<span class="chip">${escapeHtml(e)}</span>`).join('');
 
           const li = document.createElement('li');
           li.className = 'svc-item';
           li.innerHTML = `
             <div class="svc-head">
-              <span class="svc-name">${s.service_name}</span>
-              <span class="band ${band}">Score: ${sRisk.toFixed(1)} (${band})</span>
+              <span class="svc-name">${escapeHtml(s.service_name)}</span>
+              <span class="band ${sBand}">Score: ${sRisk.toFixed(1)}</span>
             </div>
             <div class="svc-chips">${entChips}</div>
           `;
           serviceList.appendChild(li);
 
-          candA.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
-          candB.innerHTML += `<option value="${s.service_name}">${s.service_name}</option>`;
+          candA.innerHTML += `<option value="${escapeHtml(s.service_name)}">${escapeHtml(s.service_name)}</option>`;
+          candB.innerHTML += `<option value="${escapeHtml(s.service_name)}">${escapeHtml(s.service_name)}</option>`;
         });
       }
+    }
+
+    // Privacy Exposure Ledger (Problem 6 & 7)
+    function renderLedger(data) {
+      const tbody = document.getElementById('ledger-body');
+      tbody.innerHTML = '';
+
+      const exposure = data.exposure_by_data_type || {};
+      const keys = Object.keys(exposure);
+
+      if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No exposure records available.</td></tr>';
+        return;
+      }
+
+      keys.forEach(entity => {
+        const item = exposure[entity];
+        const risk = Number(item.risk_0_100 || 0);
+        const band = getRiskBand(risk);
+        const services = (item.services || []).map(s => `<span class="chip" style="margin: 2px;">${escapeHtml(s)}</span>`).join('');
+        const quote = item.worst_clause ? `"${escapeHtml(item.worst_clause)}"` : '<em>None recorded</em>';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(entity)}</strong></td>
+          <td><span class="band ${band}">${risk.toFixed(1)} / 100</span></td>
+          <td>${services}</td>
+          <td style="font-size: 12.5px; color: var(--ink-2); line-height: 1.4;">${quote}</td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
     function renderCandidateResult(suffix, data) {
@@ -730,16 +932,16 @@
 
       const overlapDiv = document.getElementById(`overlap-${suffix}`);
       if (data.overlapping_entities && data.overlapping_entities.length) {
-        overlapDiv.innerHTML = data.overlapping_entities.map(e => `<span class="chip safe">${e}</span>`).join('');
+        overlapDiv.innerHTML = data.overlapping_entities.map(e => `<span class="chip safe">${escapeHtml(e)}</span>`).join('');
       } else {
         overlapDiv.innerHTML = '<span class="chip">None</span>';
       }
 
       const newDiv = document.getElementById(`new-${suffix}`);
       if (data.newly_introduced_entities && data.newly_introduced_entities.length) {
-        newDiv.innerHTML = data.newly_introduced_entities.map(e => `<span class="chip alert">⚠️ ${e}</span>`).join('');
+        newDiv.innerHTML = data.newly_introduced_entities.map(e => `<span class="chip alert">⚠️ ${escapeHtml(e)}</span>`).join('');
       } else {
-        newDiv.innerHTML = '<span class="chip safe">✅ No new exposure</span>';
+        newDiv.innerHTML = '<span class="chip safe">✓ No new data types exposed</span>';
       }
     }
 
@@ -784,6 +986,126 @@
         document.getElementById('candidate-results').style.display = 'block';
       } catch (error) {
         showStatus(error.message, true);
+      }
+    });
+
+    // Direct Policy Scanner Logic (Problem 1, 4, 5)
+    document.getElementById('direct-scan-btn').addEventListener('click', async () => {
+      hideStatus();
+      const text = document.getElementById('scan-text').value.trim();
+      const url = document.getElementById('scan-url').value.trim();
+
+      if (!text) {
+        showStatus("Please paste some policy text to analyze.", true);
+        return;
+      }
+
+      const scanBtn = document.getElementById('direct-scan-btn');
+      scanBtn.disabled = true;
+      scanBtn.textContent = "Analyzing Policy...";
+
+      const MAX_POLICY_CHARS = 50000;
+      const isTruncated = text.length > MAX_POLICY_CHARS;
+      const sendText = text.substring(0, MAX_POLICY_CHARS);
+
+      try {
+        const response = await fetch('/api/analyze-policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: sendText,
+            url: url,
+            truncated: isTruncated,
+            source: 'dashboard_manual'
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Extraction failed.');
+
+        lastScanData = data;
+        displayScanResults(data);
+      } catch (e) {
+        showStatus(`Analysis failed: ${e.message}`, true);
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.textContent = "Analyze Policy";
+      }
+    });
+
+    function displayScanResults(data) {
+      document.getElementById('scan-results').style.display = 'block';
+      document.getElementById('scan-service-name').innerText = data.service_name || "Unknown Service";
+
+      const score = Number(data.risk_score ?? data.risk ?? 0);
+      document.getElementById('scan-score').innerText = score.toFixed(0);
+
+      const category = data.risk_category || "Inconclusive";
+      const bandEl = document.getElementById('scan-band');
+      bandEl.innerText = category;
+      bandEl.className = `band ${category.replace(/\s+/g, '')}`;
+
+      document.getElementById('scan-gauge-fill').style.width = `${Math.min(100, Math.round(score))}%`;
+
+      // Coverage display
+      const cov = data.coverage || {};
+      const covEl = document.getElementById('scan-coverage');
+      let covHtml = `<strong>Scan Status:</strong> `;
+      if (cov.status === 'partial') {
+        covHtml += `<span style="color:var(--alert);">Partial</span> (Analysed first 50k characters; policy was longer). `;
+      } else if (cov.status === 'insufficient') {
+        covHtml += `<span style="color:var(--neutral-text);">Insufficient</span> (Text too short or no privacy clauses found). `;
+      } else {
+        covHtml += `<span style="color:var(--safe);">Complete</span> (Analysed ${cov.analysed_chars} chars, ${cov.clauses_found} clauses). `;
+      }
+      if (cov.is_demo) covHtml += `<em>[Offline demo extractor]</em>`;
+      covEl.innerHTML = covHtml;
+
+      // Top Clauses
+      const clausesBox = document.getElementById('scan-top-clauses');
+      clausesBox.innerHTML = '';
+      const top = [...(data.clauses || [])].slice(0, 3);
+      top.forEach(c => {
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.background = '#fafbfc';
+        item.style.borderLeft = '3px solid var(--ink)';
+        item.style.borderRadius = '0 4px 4px 0';
+        item.innerHTML = `
+          <div style="font-size: 11.5px; color: var(--ink-3); margin-bottom: 2px;"><strong>${escapeHtml(c.risk_category || 'Identified Risk')}</strong></div>
+          <div style="font-style: italic; font-size: 13px;">"${escapeHtml((c.text || '').substring(0, 160))}..."</div>
+        `;
+        clausesBox.appendChild(item);
+      });
+
+      // Entities
+      const entBox = document.getElementById('scan-entities');
+      entBox.innerHTML = '';
+      (data.canonical_entities || []).forEach(e => {
+        entBox.innerHTML += `<span class="chip">${escapeHtml(e)}</span>`;
+      });
+    }
+
+    document.getElementById('scan-save-btn').addEventListener('click', async () => {
+      if (!lastScanData) return;
+      const btn = document.getElementById('scan-save-btn');
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const res = await fetch('/api/save-service', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lastScanData)
+        });
+        if (!res.ok) throw new Error("Failed to save service.");
+        showStatus(`"${lastScanData.service_name}" added to portfolio successfully!`);
+        btn.textContent = "Saved to Portfolio";
+        loadPortfolio();
+      } catch (e) {
+        showStatus(e.message, true);
+        btn.disabled = false;
+        btn.textContent = "Retry Add";
       }
     });
 

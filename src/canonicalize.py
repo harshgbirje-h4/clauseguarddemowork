@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import os
 
@@ -119,29 +120,99 @@ class EntityCanonicalizer:
             "last name": "Name",
             "full name": "Name",
             
-            "general data": "General Data"
+            "general data": "General Data",
+
+            # Added after reviewing real policy phrasing (see data/evaluation/entity_phrases.json)
+            "precise geolocation": "Precise Location",
+            "exact geolocation": "Precise Location",
+            "browsing history": "Usage Data",
+            "search history": "Usage Data",
+            "browsing data": "Usage Data",
+            "payment card": "Payment Information",
+            "payment card details": "Payment Information",
+            "card details": "Payment Information",
+            "biometric identifiers": "Biometric Data",
+            "biometric information": "Biometric Data",
+            "email addresses": "Email",
         }
+
+    # Leading words that do not change the meaning of a data type
+    _LEADING_WORDS = ("your ", "our ", "the ", "any ", "my ", "their ", "his ", "her ", "its ", "a ", "an ", "all ")
+
+    @classmethod
+    def _variants(cls, raw_entity):
+        """
+        Candidate spellings of one raw phrase, most specific first:
+        lowercased, punctuation stripped, possessive/article prefix removed,
+        and simple singular forms (addresses -> address, cookies -> cookie).
+        """
+        text = re.sub(r"[^a-z0-9\- ]", " ", raw_entity.lower())
+        text = " ".join(text.split())
+        variants = [text]
+        for prefix in cls._LEADING_WORDS:
+            if text.startswith(prefix):
+                variants.append(text[len(prefix):])
+        base = list(dict.fromkeys(variants))
+        for v in base:
+            if v.endswith("ies") and len(v) > 4:
+                variants.append(v[:-3] + "y")
+            elif v.endswith("es") and len(v) > 3:
+                variants.append(v[:-2])
+            if v.endswith("s") and not v.endswith("ss") and len(v) > 3:
+                variants.append(v[:-1])
+        return list(dict.fromkeys(variants))
+
+    def resolve_detail(self, raw_entity):
+        """
+        Return a dict describing how a raw phrase was handled:
+
+          canonical   'Unknown: <original>' unless the phrase is an exact or variant match
+          is_known    True only for exact/variant matches
+          match_kind  'exact' | 'suggested' | 'none'
+          suggestion  for 'suggested': the category a known term appears to point to
+
+        Partial (whole-word) matches are NEVER used as classifications. For example
+        'Browser Fingerprint' contains 'fingerprint', but browser fingerprinting is not
+        biometric data, so the phrase stays unknown and the category is only offered
+        as a suggestion for a human reviewer.
+        """
+        unknown = f"Unknown: {raw_entity.strip()}" if raw_entity and raw_entity.strip() else None
+        if not raw_entity or not raw_entity.strip():
+            return {"canonical": None, "is_known": False, "match_kind": "none", "suggestion": None}
+
+        variants = self._variants(raw_entity)
+        for candidate in variants:
+            if candidate in self.mapping:
+                return {"canonical": self.mapping[candidate], "is_known": True,
+                        "match_kind": "exact", "suggestion": None}
+
+        suggestion = None
+        for term in sorted(self.mapping, key=len, reverse=True):
+            if len(term) < 3:
+                continue  # short keys such as 'id' or 'os' match too easily inside words
+            if re.search(r"\b" + re.escape(term) + r"\b", variants[0]):
+                suggestion = self.mapping[term]
+                break
+
+        return {"canonical": unknown, "is_known": False,
+                "match_kind": "suggested" if suggestion else "none",
+                "suggestion": suggestion}
+
+    def resolve(self, raw_entity):
+        """Return (canonical_name, is_known)."""
+        detail = self.resolve_detail(raw_entity)
+        return detail["canonical"], detail["is_known"]
 
     def canonicalize(self, raw_entity):
         """
         Normalize and map raw entity to canonical entity.
         """
-        if not raw_entity:
-            return None
-            
-        # Trim whitespace and convert to lowercase for matching
-        normalized_input = " ".join(raw_entity.split()).strip().lower()
-        
-        if not normalized_input:
-            return None
-        
-        # Check explicit mapping
-        if normalized_input in self.mapping:
-            return self.mapping[normalized_input]
-            
-        # Do not silently convert unknown entities into misleading canonical names.
-        # Leave them identifiable as unknown mapping.
-        return f"Unknown: {raw_entity.strip()}"
+        canonical, _ = self.resolve(raw_entity)
+        return canonical
+
+    def is_known(self, raw_entity):
+        _, known = self.resolve(raw_entity)
+        return known
 
 
 class DatabaseLoader:

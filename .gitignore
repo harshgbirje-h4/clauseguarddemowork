@@ -23,3 +23,5 @@ clauseenv.bak/
 *.log
 data/db/temp_*.db
 clauseguard_demo_*.db
+# Local SQLite database
+data/db/portfolio.db

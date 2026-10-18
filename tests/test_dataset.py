@@ -17,7 +17,7 @@ class TestDatasetValidator(unittest.TestCase):
     def test_real_dataset_is_valid(self):
         # This will fail if the real dataset has leakage or bad schema
         stats = self.validator.validate_all()
-        self.assertEqual(stats["total"], 14)
+        self.assertEqual(stats["total"], 40)
         self.assertGreater(stats["positive"], 0)
         self.assertGreater(stats["negative"], 0)
 

@@ -6,13 +6,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Ensure project root is in path
+# Ensure project root and src dir are in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.scoring import ScoringEngine
 from src.marginal import MarginalRiskEngine
 from src.extract import extract_pipeline
 from src.canonicalize import EntityCanonicalizer
+from src.risk import policy_risk_score, risk_category, coverage_report
 
 app = Flask(__name__, static_folder='static')
 
@@ -34,6 +36,8 @@ def get_portfolio():
     engine = ScoringEngine()
     try:
         data = engine.get_portfolio_data(DB_PATH)
+        # Additive score kept for compatibility; the de-duplicated view is added alongside it.
+        data.update(engine.get_exposure_by_data_type(DB_PATH))
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -69,7 +73,9 @@ def analyze_policy():
         
     url = data.get("url", "")
     title = data.get("title", "")
-    
+    # Set by the extension when the page text was cut before it was sent.
+    truncated = bool(data.get("truncated", False))
+
     # Always prioritize domain name so everything doesn't get grouped as "Privacy Policy"
     service_name = ""
     if url:
@@ -102,24 +108,208 @@ def analyze_policy():
         # C2 Canonicalization (in-memory)
         canonicalizer = EntityCanonicalizer()
         all_canonical_entities = set()
+        unmapped = {}        # raw phrase -> suggested category (or None)
+        entity_sources = {}  # canonical entity -> clause texts it came from (for review)
         for clause in extracted.get("clauses", []):
-            canon_list = [c_e for e in clause.get("entities", []) if (c_e := canonicalizer.canonicalize(e)) is not None]
+            canon_list = []
+            clause_text = (clause.get("text") or "")[:200]
+            for raw in clause.get("entities", []):
+                detail = canonicalizer.resolve_detail(raw)
+                if detail["canonical"] is None:
+                    continue
+                canon_list.append(detail["canonical"])
+                if detail["is_known"]:
+                    sources = entity_sources.setdefault(detail["canonical"], [])
+                    if clause_text and clause_text not in sources:
+                        sources.append(clause_text)
+                else:
+                    unmapped[raw.strip()] = detail["suggestion"]
             clause["canonical_entities"] = canon_list
             all_canonical_entities.update(canon_list)
-            
-        # C4 Scoring
-        scoring_engine = ScoringEngine()
-        risk = scoring_engine.calculate_service_score_from_clauses(extracted.get("clauses", []))
-        
+
+        clauses = extracted.get("clauses", [])
         mode = extracted.get("mode", "UNKNOWN")
-        
+        is_demo = mode.startswith("MOCK")
+
+        # C4 Scoring: bounded 0-100 score, plus category and coverage.
+        # The old unbounded sum is kept as raw_risk for backward compatibility.
+        score = policy_risk_score(clauses)
+        coverage = coverage_report(
+            analysed_chars=len(text),
+            truncated=truncated,
+            clauses_found=len(clauses),
+            is_demo=is_demo,
+        )
+        category = risk_category(score, coverage)
+        raw_risk = ScoringEngine().calculate_service_score_from_clauses(clauses)
+
+        # Check if service is already saved in portfolio
+        is_saved = False
+        previous_scan = None
+        if os.path.exists(DB_PATH):
+            try:
+                import sqlite3
+                conn = sqlite3.connect(DB_PATH)
+                cur = conn.cursor()
+                cur.execute("SELECT id, name, category FROM services WHERE name = ? COLLATE NOCASE", (extracted.get("service_name"),))
+                s_row = cur.fetchone()
+                if s_row:
+                    is_saved = True
+                    s_id, s_name, s_cat = s_row
+                    cur.execute("SELECT severity_score, specificity_score FROM clauses WHERE service_id = ?", (s_id,))
+                    c_rows = cur.fetchall()
+                    c_list = [{'severity_score': r[0], 'specificity_score': r[1]} for r in c_rows]
+                    s_score = policy_risk_score(c_list)
+                    legacy_score = ScoringEngine().calculate_service_score_from_clauses(c_list)
+                    cur.execute("""
+                        SELECT DISTINCT ce.name
+                        FROM canonical_entities ce
+                        JOIN clause_entity_mapping cem ON ce.id = cem.entity_id
+                        JOIN clauses c ON cem.clause_id = c.id
+                        WHERE c.service_id = ?
+                    """, (s_id,))
+                    p_entities = [r[0] for r in cur.fetchall()]
+                    previous_scan = {
+                        "service_name": s_name,
+                        "service_score": s_score,
+                        "legacy_score": legacy_score,
+                        "entities": p_entities,
+                        "clause_count": len(c_rows)
+                    }
+                conn.close()
+            except Exception as dbe:
+                logging.warning(f"Could not check existing service in portfolio: {dbe}")
+
+        # Extract third-party sharing and user privacy controls (Phase 2 & 3)
+        sharing_keywords = [
+            "share", "disclose", "distribute", "sell", "transfer", "third part", "affiliate", "partner",
+            "advertis", "marketing partner", "vendor", "service provider"
+        ]
+        control_keywords = [
+            "opt-out", "opt out", "unsubscribe", "delete", "deletion", "rectif", "access your data",
+            "privacy setting", "your choice", "cookie setting", "do not track", "rights", "request"
+        ]
+
+        sharing_findings = []
+        control_findings = []
+        for c in clauses:
+            c_text = c.get("text") or ""
+            c_text_lower = c_text.lower()
+            c_sev = float(c.get("severity_score") or 0)
+            c_spec = float(c.get("specificity_score") or 0)
+            c_risk = round(100.0 * (c_sev / 5.0) * (c_spec / 5.0), 1)
+
+            if any(kw in c_text_lower for kw in sharing_keywords):
+                if any(w in c_text_lower for w in ["sell", "sale", "commercial value", "monetiz"]):
+                    kind = "Selling / Commercial Transfer"
+                    summary = "States or reserves the right to sell or commercially transfer personal data."
+                elif any(w in c_text_lower for w in ["advertis", "marketing partner", "ad network", "targeted ad"]):
+                    kind = "Advertising & Marketing Partners"
+                    summary = "Discloses personal data to advertisers, ad networks, or promotional partners."
+                elif any(w in c_text_lower for w in ["vendor", "service provider", "subprocessor", "contractor", "processor"]):
+                    kind = "Service Providers & Vendors"
+                    summary = "Transfers data to contracted third-party operational service providers."
+                elif any(w in c_text_lower for w in ["affiliate", "subsidiary", "parent company", "group company"]):
+                    kind = "Corporate Affiliates"
+                    summary = "Shares personal information across internal corporate entities and affiliates."
+                else:
+                    kind = "Third-Party Sharing"
+                    summary = "Discloses personal information to external third parties."
+
+                sharing_findings.append({
+                    "kind": kind,
+                    "summary": summary,
+                    "clause_text": c_text,
+                    "risk": c_risk,
+                    "entities": c.get("canonical_entities") or c.get("entities") or []
+                })
+
+            if any(kw in c_text_lower for kw in control_keywords):
+                if any(w in c_text_lower for w in ["delete", "deletion", "erasure", "erase", "remove account"]):
+                    kind = "Account / Data Deletion"
+                    summary = "Provides procedures to request deletion of personal information or account data."
+                elif any(w in c_text_lower for w in ["opt-out", "opt out", "unsubscribe", "promotional email"]):
+                    kind = "Marketing Opt-Out"
+                    summary = "Allows opting out of direct promotional communications or targeted messages."
+                elif any(w in c_text_lower for w in ["cookie", "do not track", "tracker", "ad preference"]):
+                    kind = "Cookie & Tracking Controls"
+                    summary = "Offers controls or instructions for managing cookies and tracking technologies."
+                elif any(w in c_text_lower for w in ["access", "copy", "portability", "export", "download your data"]):
+                    kind = "Data Access & Portability"
+                    summary = "Specifies rights to request a copy of collected personal records."
+                else:
+                    kind = "Privacy Rights & Requests"
+                    summary = "Describes privacy preferences and request mechanisms."
+
+                control_findings.append({
+                    "kind": kind,
+                    "summary": summary,
+                    "clause_text": c_text,
+                    "risk": c_risk,
+                    "category": c.get("risk_category") or "User Control"
+                })
+
+        if len(control_findings) < 2 and text:
+            raw_sentences = [s.strip() for s in text.replace("\n", " ").split(".") if len(s.strip()) > 15]
+            for s in raw_sentences:
+                s_lower = s.lower()
+                if any(kw in s_lower for kw in control_keywords):
+                    if any(w in s_lower for w in ["delete", "deletion", "erasure", "erase", "remove account"]):
+                        kind = "Account / Data Deletion"
+                        summary = "Provides procedures to request deletion of personal information or account data."
+                    elif any(w in s_lower for w in ["opt-out", "opt out", "unsubscribe", "promotional email"]):
+                        kind = "Marketing Opt-Out"
+                        summary = "Allows opting out of direct promotional communications or targeted messages."
+                    elif any(w in s_lower for w in ["cookie", "do not track", "tracker", "ad preference"]):
+                        kind = "Cookie & Tracking Controls"
+                        summary = "Offers controls or instructions for managing cookies and tracking technologies."
+                    elif any(w in s_lower for w in ["access", "copy", "portability", "export", "download your data"]):
+                        kind = "Data Access & Portability"
+                        summary = "Specifies rights to request a copy of collected personal records."
+                    else:
+                        kind = "Privacy Rights & Requests"
+                        summary = "Describes privacy preferences and request mechanisms."
+
+                    if not any(cf["clause_text"] == s for cf in control_findings):
+                        control_findings.append({
+                            "kind": kind,
+                            "summary": summary,
+                            "clause_text": s,
+                            "risk": 15.0,
+                            "category": "User Control"
+                        })
+                if len(control_findings) >= 5:
+                    break
+
+        # Collection findings (Phase 2: What data is collected?)
+        collection_findings = []
+        for ent in sorted(list(all_canonical_entities)):
+            sources = entity_sources.get(ent, [])
+            quote = sources[0] if sources else None
+            collection_findings.append({
+                "entity": ent,
+                "evidence": quote
+            })
+
         # Assemble Response
         response_data = {
             "service_name": extracted.get("service_name"),
             "mode": mode,
-            "clauses": extracted.get("clauses", []),
+            "clauses": clauses,
             "canonical_entities": sorted(list(all_canonical_entities)),
-            "risk": risk,
+            "collection_findings": collection_findings,
+            "unmapped_entities": sorted(unmapped),
+            "unmapped_suggestions": unmapped,   # raw phrase -> suggested category, for review only
+            "entity_sources": entity_sources,   # canonical entity -> clause text it came from
+            "risk": score,              # 0-100, same key the extension already reads
+            "risk_score": score,
+            "risk_category": category,  # Low / Moderate / High / Very High / Inconclusive
+            "raw_risk": raw_risk,       # legacy unbounded sum, not for display
+            "coverage": coverage,
+            "is_saved_in_portfolio": is_saved,
+            "previous_scan": previous_scan,
+            "sharing_findings": sharing_findings[:5],
+            "control_findings": control_findings[:5],
             "policy_url": url
         }
         return jsonify(response_data)
@@ -297,6 +487,55 @@ def compare_services():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/service-status', methods=['GET'])
+def get_service_status():
+    if not os.path.exists(DB_PATH):
+        return jsonify({"is_saved": False, "service": None})
+    name = request.args.get('name', '').strip()
+    if not name:
+        return jsonify({"is_saved": False, "service": None})
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, category FROM services WHERE name = ? COLLATE NOCASE", (name,))
+        s_row = cur.fetchone()
+        if not s_row:
+            # Try matching hostname variations (e.g. spotify from spotify.com)
+            clean_name = name.lower().replace("www.", "").split(".")[0].capitalize()
+            cur.execute("SELECT id, name, category FROM services WHERE name = ? COLLATE NOCASE", (clean_name,))
+            s_row = cur.fetchone()
+            
+        if s_row:
+            s_id, s_name, s_cat = s_row
+            cur.execute("SELECT severity_score, specificity_score FROM clauses WHERE service_id = ?", (s_id,))
+            c_rows = cur.fetchall()
+            c_list = [{'severity_score': r[0], 'specificity_score': r[1]} for r in c_rows]
+            s_score = policy_risk_score(c_list)
+            cur.execute("""
+                SELECT DISTINCT ce.name
+                FROM canonical_entities ce
+                JOIN clause_entity_mapping cem ON ce.id = cem.entity_id
+                JOIN clauses c ON cem.clause_id = c.id
+                WHERE c.service_id = ?
+            """, (s_id,))
+            entities = [r[0] for r in cur.fetchall()]
+            conn.close()
+            return jsonify({
+                "is_saved": True,
+                "service": {
+                    "service_name": s_name,
+                    "service_score": s_score,
+                    "category": s_cat,
+                    "entities": entities,
+                    "clause_count": len(c_rows)
+                }
+            })
+        conn.close()
+        return jsonify({"is_saved": False, "service": None})
+    except Exception as e:
+        return jsonify({"error": str(e), "is_saved": False}), 500
+
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -306,18 +545,27 @@ def proxy_fetch():
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     try:
-        url = request.json.get("url")
-        import requests
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-        res = requests.get(url, headers=headers, timeout=10)
-        
-        html = res.text
-        
-        # If the website blocks our Python bot (e.g. Cloudflare 403 or 200 Challenge), throw an error
-        if res.status_code != 200 or "Just a moment..." in html or "cloudflare" in html.lower() or "datadome" in html.lower():
-            return jsonify({"error": f"Website blocked the background fetch."}), 403
+        url = request.json.get("url") if request.json else None
+        if not url:
+            return jsonify({"error": "Missing 'url' parameter"}), 400
             
-        return jsonify({"html": html}), 200
+        import urllib.request
+        import urllib.error
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            html = response.read().decode('utf-8', errors='replace')
+            if "Just a moment..." in html or "cloudflare" in html.lower() or "datadome" in html.lower():
+                return jsonify({"error": "Website anti-bot protection blocked the background fetch."}), 403
+            return jsonify({"html": html}), 200
+    except urllib.error.HTTPError as he:
+        return jsonify({"error": f"HTTP {he.code}: {he.reason}"}), 403 if he.code in [401, 403] else 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

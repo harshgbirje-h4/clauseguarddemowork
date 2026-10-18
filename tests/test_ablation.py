@@ -19,16 +19,25 @@ class TestAblationStudy(unittest.TestCase):
         
         self.assertIn("dataset_version", result)
         self.assertIn("dataset_size", result)
-        self.assertEqual(result["dataset_size"], 14)
+        self.assertEqual(result["dataset_size"], 40)
         self.assertEqual(result["evaluation_mode"], "MOCK/DEV")
         
         # Check naive
+        # Derive the expected naive counts from the labels, so the test does not
+        # depend on a hardcoded copy of the dataset.
+        import json as _json
+        gt_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')),
+                               'data', 'evaluation', 'ground_truth.json')
+        with open(gt_path, encoding='utf-8') as f:
+            labels = [ex["label"] for ex in _json.load(f)["examples"]]
+        positives = sum(labels)
+        negatives = len(labels) - positives
         naive = result["approaches"]["Naive"]
-        self.assertEqual(naive["TP"], 7)
-        self.assertEqual(naive["FP"], 7)
+        self.assertEqual(naive["TP"], positives)
+        self.assertEqual(naive["FP"], negatives)
         self.assertEqual(naive["FN"], 0)
         self.assertEqual(naive["TN"], 0)
-        self.assertEqual(naive["Precision"], 0.5)
+        self.assertAlmostEqual(naive["Precision"], positives / len(labels))
         self.assertEqual(naive["Recall"], 1.0)
         
         # Check prefilter metrics exist

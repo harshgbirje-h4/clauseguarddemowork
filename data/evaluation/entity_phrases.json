@@ -1,0 +1,131 @@
+{
+  "version": "1.0",
+  "description": "Phrase-to-category check for the entity canonicalizer. 'expected' is the category a careful reader would assign; 'Unknown' means the phrase is outside the schema and should be left unmapped.",
+  "provenance": "Drafted by the ClauseGuard developer. NOT yet independently reviewed. Review before citing accuracy figures.",
+  "examples": [
+    {
+      "phrase": "Your email addresses",
+      "expected": "Email"
+    },
+    {
+      "phrase": "the phone numbers",
+      "expected": "Phone Number"
+    },
+    {
+      "phrase": "IP addresses",
+      "expected": "IP Address"
+    },
+    {
+      "phrase": "precise geolocation",
+      "expected": "Precise Location"
+    },
+    {
+      "phrase": "GPS location",
+      "expected": "Location"
+    },
+    {
+      "phrase": "Your browsing history",
+      "expected": "Usage Data"
+    },
+    {
+      "phrase": "search history",
+      "expected": "Usage Data"
+    },
+    {
+      "phrase": "Cookies and web beacons",
+      "expected": "Cookies"
+    },
+    {
+      "phrase": "cookies",
+      "expected": "Cookies"
+    },
+    {
+      "phrase": "your name",
+      "expected": "Name"
+    },
+    {
+      "phrase": "full name",
+      "expected": "Name"
+    },
+    {
+      "phrase": "payment card details",
+      "expected": "Payment Information"
+    },
+    {
+      "phrase": "credit card numbers",
+      "expected": "Payment Information"
+    },
+    {
+      "phrase": "biometric identifiers",
+      "expected": "Biometric Data"
+    },
+    {
+      "phrase": "fingerprint",
+      "expected": "Biometric Data"
+    },
+    {
+      "phrase": "device identifiers",
+      "expected": "Identifiers"
+    },
+    {
+      "phrase": "Device information",
+      "expected": "Device Information"
+    },
+    {
+      "phrase": "mobile numbers",
+      "expected": "Phone Number"
+    },
+    {
+      "phrase": "e-mail addresses",
+      "expected": "Email"
+    },
+    {
+      "phrase": "postal addresses",
+      "expected": "Contact Information"
+    },
+    {
+      "phrase": "advertising identifiers",
+      "expected": "Advertising Data"
+    },
+    {
+      "phrase": "analytics data",
+      "expected": "Analytics Data"
+    },
+    {
+      "phrase": "messages you send",
+      "expected": "Communications"
+    },
+    {
+      "phrase": "usernames",
+      "expected": "Account Information"
+    },
+    {
+      "phrase": "social security number",
+      "expected": "Unknown"
+    },
+    {
+      "phrase": "health records",
+      "expected": "Unknown"
+    },
+    {
+      "phrase": "children's data",
+      "expected": "Unknown"
+    },
+    {
+      "phrase": "a unique identifier",
+      "expected": "Identifiers"
+    },
+    {
+      "phrase": "log data",
+      "expected": "Usage Data"
+    },
+    {
+      "phrase": "the browser you use",
+      "expected": "Browser Information"
+    },
+    {
+      "phrase": "browser type",
+      "expected": "Browser Information"
+    }
+  ]
+}

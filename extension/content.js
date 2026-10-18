@@ -1,35 +1,36 @@
-// Extract text from the page safely
+// ClauseGuard Content Script
+// Extracts text, detects privacy policies & links, and powers the Active Login Shield
+
+const MAX_POLICY_CHARS = 50000;
+
+// Extract readable text from the current page
 function extractPageText() {
-    // Basic heuristic cleanup: remove hidden elements, scripts, styles
     const clone = document.body.cloneNode(true);
     
+    // Remove scripts, styles, navigation, headers, footers, noscript, iframe
     const elementsToRemove = clone.querySelectorAll('script, style, nav, footer, header, noscript, iframe');
     elementsToRemove.forEach(el => el.remove());
 
     let text = clone.innerText || "";
-    
-    // Normalize excessive whitespace
     text = text.replace(/\s+/g, ' ').trim();
     
-    // Sensible text limit (50,000 characters to process the entire document)
-    const MAX_LENGTH = 50000;
-    const truncated = text.length > MAX_LENGTH;
+    const truncated = text.length > MAX_POLICY_CHARS;
     if (truncated) {
-        text = text.substring(0, MAX_LENGTH);
+        text = text.substring(0, MAX_POLICY_CHARS);
     }
     
-    // Basic heuristic to guess if this is a privacy policy
-    const titleLower = document.title.toLowerCase();
-    const urlLower = window.location.href.toLowerCase();
+    // Heuristic detection: is the current page likely a privacy policy?
+    const titleLower = (document.title || "").toLowerCase();
+    const urlLower = (window.location.href || "").toLowerCase();
     const privacyKeywords = ['privacy policy', 'privacy notice', 'privacy statement', 'data protection', 'data policy', 'privacy'];
     
     let isLikelyPrivacyPolicy = false;
-    if (privacyKeywords.some(kw => titleLower.includes(kw) || urlLower.includes(kw.replace(' ', '-')) || urlLower.includes(kw.replace(' ', '')))) {
+    if (privacyKeywords.some(kw => titleLower.includes(kw) || urlLower.includes(kw.replace(/\s+/g, '-')) || urlLower.includes(kw.replace(/\s+/g, '')))) {
         isLikelyPrivacyPolicy = true;
     }
     
     if (!isLikelyPrivacyPolicy) {
-        const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => h.innerText.toLowerCase());
+        const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => (h.innerText || '').toLowerCase());
         if (headings.some(h => privacyKeywords.some(kw => h.includes(kw)))) {
             isLikelyPrivacyPolicy = true;
         }
@@ -37,7 +38,7 @@ function extractPageText() {
     
     const textPrefix = text.substring(0, 2000).toLowerCase();
     if (!isLikelyPrivacyPolicy && privacyKeywords.some(kw => textPrefix.includes(kw))) {
-         isLikelyPrivacyPolicy = true;
+        isLikelyPrivacyPolicy = true;
     }
 
     let title = document.title;
@@ -58,214 +59,171 @@ function extractPageText() {
     };
 }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "extract_text") {
-        handleExtraction().then(data => sendResponse(data));
-        return true; // Keep message channel open for async response
-    }
+// Find a link to the site's privacy policy from the DOM
+function findPrivacyPolicyLink() {
+    const links = Array.from(document.querySelectorAll('a'));
     
-    if (request.action === "run_backend_analysis") {
-        // This runs in the web page context, so it won't die if the popup closes!
-        fetch("http://127.0.0.1:5000/api/analyze-policy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                text: request.data.text,
-                url: request.data.url,
-                title: request.data.title
-            })
-        })
-        .then(res => res.json())
-        .then(analysisData => {
-            // Save it so popup can read it later
-            chrome.storage.local.set({
-                cachedAnalysis: {
-                    url: window.location.hostname,
-                    timestamp: Date.now(),
-                    data: analysisData,
-                    newEntities: []
-                }
-            });
-            sendResponse({status: "success", data: analysisData});
-        })
-        .catch(err => {
-            sendResponse({status: "error", error: err.message});
-        });
-        
-        return true;
-    }
-});
-
-async function handleExtraction() {
-    const basicData = extractPageText();
-    
-    // If user is already looking at the privacy policy, just use the page text
-    if (basicData.isLikelyPrivacyPolicy) {
-        return basicData;
-    }
-
-    // If they are on a shopping site homepage, let's auto-discover the policy for them!
-    const privacyLink = findPrivacyPolicyLink();
-    if (privacyLink) {
-        try {
-            const proxyResponse = await fetch("http://127.0.0.1:5000/api/proxy-fetch", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url: privacyLink.href })
-            });
-            
-            if (proxyResponse.ok) {
-                const proxyData = await proxyResponse.json();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(proxyData.html, "text/html");
-                
-                const elementsToRemove = doc.querySelectorAll('script, style, nav, footer, header, noscript, iframe');
-                elementsToRemove.forEach(el => el.remove());
-                
-                let policyText = doc.body.innerText.replace(/\s+/g, ' ').trim();
-                let truncated = false;
-                if (policyText.length > 50000) {
-                    policyText = policyText.substring(0, 50000);
-                    truncated = true;
-                }
-                
-                return {
-                    text: policyText,
-                    url: privacyLink.href,
-                    title: basicData.title,
-                    truncated: truncated,
-                    isLikelyPrivacyPolicy: true,
-                    wasAutoDiscovered: true
-                };
-            } else {
-                return {
-                    error: true,
-                    blockedBySecurity: true,
-                    message: "🛡️ Anti-Bot Security Firewall blocked the background scan. Please click the Privacy Policy link at the bottom of the page to scan it directly."
-                };
-            }
-        } catch (e) {
-            console.error("Auto-discovery fetch failed", e);
+    // Pass 1: exact or high-confidence anchor text
+    for (const a of links) {
+        const text = (a.innerText || "").toLowerCase().trim();
+        const href = (a.href || "").trim();
+        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
+        if (text === "privacy policy" || text === "privacy notice" || text === "privacy statement") {
+            return { href: a.href, text: a.innerText.trim() };
         }
     }
     
-    // Fallback if no link found
-    return basicData;
+    // Pass 2: anchor text contains privacy
+    for (const a of links) {
+        const text = (a.innerText || "").toLowerCase().trim();
+        const href = (a.href || "").trim();
+        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
+        if (text.includes("privacy policy") || text.includes("privacy notice") || text.includes("data protection policy")) {
+            return { href: a.href, text: a.innerText.trim() };
+        }
+    }
+    
+    // Pass 3: general 'privacy' link
+    for (const a of links) {
+        const text = (a.innerText || "").toLowerCase().trim();
+        const href = (a.href || "").trim();
+        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
+        if (text === "privacy" || text.includes("privacy")) {
+            return { href: a.href, text: a.innerText.trim() };
+        }
+    }
+
+    // Pass 4: URL structure
+    for (const a of links) {
+        const href = (a.href || "").toLowerCase();
+        if (!href || href.startsWith('javascript:') || href === '#') continue;
+        if (href.includes("/privacy-policy") || href.includes("/privacy") || href.includes("privacy.html") || href.includes("privacypolicy")) {
+            return { href: a.href, text: (a.innerText || "").trim() || "Privacy Policy" };
+        }
+    }
+
+    return null;
 }
 
+// Helper to send messages to background service worker safely
+function sendBgMessage(action, payload = {}) {
+    return new Promise((resolve) => {
+        try {
+            chrome.runtime.sendMessage({ action, ...payload }, (res) => {
+                if (chrome.runtime.lastError) {
+                    resolve({ ok: false, error: chrome.runtime.lastError.message });
+                } else {
+                    resolve(res || { ok: false, error: "No response from background worker" });
+                }
+            });
+        } catch (e) {
+            resolve({ ok: false, error: e.message });
+        }
+    });
+}
+
+// Listen for commands from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "extract_text") {
+        const basicData = extractPageText();
+        const privacyLink = findPrivacyPolicyLink();
+        sendResponse({
+            text: basicData.text,
+            url: window.location.href,
+            title: basicData.title,
+            truncated: basicData.truncated,
+            isLikelyPrivacyPolicy: basicData.isLikelyPrivacyPolicy,
+            policyLink: privacyLink
+        });
+        return false;
+    }
+});
+
 /* =========================================
-   THE ACTIVE LOGIN SHIELD (Plan A)
+   ACTIVE LOGIN SHIELD
 ========================================= */
 
 async function initActiveLoginShield() {
-    // 1. Smart Context Detection (MIME-Type & URL Filtering)
-    if (document.contentType !== "text/html") return; // Ignore images/videos
+    if (document.contentType !== "text/html") return;
 
     const urlObj = new URL(window.location.href);
     const path = urlObj.pathname.toLowerCase();
     const host = urlObj.hostname.toLowerCase();
     
-    // Ignore search engine result pages completely
+    // Ignore search engine result pages
     if (host.includes("google.") && path.includes("/search")) return;
     if (host.includes("bing.com") || host.includes("yahoo.com") || path.includes("/search")) return;
 
-    // Look for a password field
+    // Check if on a login page
     const passwordField = document.querySelector('input[type="password"]');
-    
-    // Must be in the PATH (e.g. /login), NOT in the search query (e.g. ?q=login)
     const isAuthPath = path.match(/\/(login|signin|auth|oauth|account\/login|wp-login)/) !== null;
     
-    // Only wake up if we are 100% sure the user is logging in
     if (!passwordField && !isAuthPath) return;
 
-    // --- NEW: SMART CACHING SYSTEM ---
-    const cacheResult = await new Promise(resolve => chrome.storage.local.get(['cachedAnalysis'], resolve));
-    if (cacheResult.cachedAnalysis && cacheResult.cachedAnalysis.url === window.location.hostname) {
-        const timeElapsed = Date.now() - cacheResult.cachedAnalysis.timestamp;
-        // If cache is less than 24 hours old, use it instantly!
-        if (timeElapsed < 24 * 60 * 60 * 1000) {
-            console.log("[ClauseGuard] Loaded analysis from Smart Cache to save API limits.");
-            injectShieldUI();
-            const analysisData = cacheResult.cachedAnalysis.data;
-            const newEntities = cacheResult.cachedAnalysis.newEntities || [];
-            
-            if (analysisData.risk > 50 || newEntities.length > 0) {
-                let msg = `🚨 High Privacy Risk (Score: ${analysisData.risk.toFixed(1)}).`;
-                if (newEntities.length > 0) msg += ` Exposing new data (${newEntities.join(', ')}).`;
-                updateShieldUI(msg, "red");
-            } else {
-                updateShieldUI(`✅ Safe Login (Score: ${analysisData.risk.toFixed(1)}). Limited data exposure.`, "green");
+    // Check cache in chrome.storage.local
+    try {
+        const cacheResult = await new Promise(resolve => chrome.storage.local.get(['cachedAnalysis'], resolve));
+        if (cacheResult.cachedAnalysis && cacheResult.cachedAnalysis.url === window.location.hostname) {
+            const timeElapsed = Date.now() - cacheResult.cachedAnalysis.timestamp;
+            if (timeElapsed < 24 * 60 * 60 * 1000) {
+                injectShieldUI();
+                showVerdict(cacheResult.cachedAnalysis.data, cacheResult.cachedAnalysis.newEntities || []);
+                return;
             }
-            return; // Stop execution here. No Gemini API calls made!
         }
-    }
-    // ---------------------------------
+    } catch (e) {}
 
-    console.log("[ClauseGuard] Active Login Shield Activated. Detecting privacy risks...");
-
-    // Inject Shield Badge near password field (or top of page if none found)
-    injectShieldUI();
-
-    // 2. Automated Privacy Policy Discovery
+    // Automated Policy Discovery
     const privacyLink = findPrivacyPolicyLink();
     if (!privacyLink) {
-        updateShieldUI("⚠️ No Privacy Policy found on this login page.", "orange");
+        injectShieldUI();
+        updateShieldUI("⚠️ No Privacy Policy link discovered on this login page.", "orange");
         return;
     }
 
+    injectShieldUI();
     updateShieldUI("Crawling Privacy Policy...", "blue");
 
     try {
-        // Fetch background policy HTML via Python proxy to bypass CORS blocks
-        const proxyResponse = await fetch("http://127.0.0.1:5000/api/proxy-fetch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: privacyLink.href })
-        });
-        
-        if (!proxyResponse.ok) {
-            updateShieldUI("🛡️ Anti-Bot Security Firewall blocked background scan. Click the Privacy Policy link to scan directly.", "orange");
+        // Fetch background policy via background service worker to prevent CSP/Mixed Content
+        const proxyRes = await sendBgMessage("bg_proxy_fetch", { url: privacyLink.href });
+        if (!proxyRes.ok || !proxyRes.data || !proxyRes.data.html) {
+            updateShieldUI("🛡️ Background scan blocked by site protection. Open policy page to scan directly.", "orange");
             return;
         }
-        const proxyData = await proxyResponse.json();
-        const html = proxyData.html;
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        
-        let policyText = doc.body.innerText.replace(/\s+/g, ' ').trim().substring(0, 15000); // 15k chars to save time
 
-        // 3. Real-Time Interception & Gemini Analysis
-        updateShieldUI("Analyzing risks via Gemini...", "blue");
-        
-        const analyzeRes = await fetch("http://127.0.0.1:5000/api/analyze-policy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(proxyRes.data.html, "text/html");
+        const elementsToRemove = doc.querySelectorAll('script, style, nav, footer, header, noscript, iframe');
+        elementsToRemove.forEach(el => el.remove());
+
+        const fullPolicyText = doc.body.innerText.replace(/\s+/g, ' ').trim();
+        const policyText = fullPolicyText.substring(0, MAX_POLICY_CHARS);
+        const policyTruncated = fullPolicyText.length > MAX_POLICY_CHARS;
+
+        updateShieldUI("Analyzing risks via ClauseGuard engine...", "blue");
+
+        const analyzeRes = await sendBgMessage("bg_analyze_policy", {
+            payload: {
                 text: policyText,
                 url: window.location.href,
-                title: document.title
-            })
+                title: document.title,
+                truncated: policyTruncated
+            }
         });
 
-        if (!analyzeRes.ok) throw new Error("API Failed");
-        const analysisData = await analyzeRes.json();
+        if (!analyzeRes.ok || !analyzeRes.data) throw new Error("Analysis failed");
+        const analysisData = analyzeRes.data;
 
-        // 3b. Pre-Login Comparison (Check against portfolio)
-        updateShieldUI("Comparing against your portfolio...", "blue");
-        const marginalRes = await fetch("http://127.0.0.1:5000/api/marginal-risk", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(analysisData)
-        });
-        
+        // Check against portfolio
+        updateShieldUI("Comparing with portfolio...", "blue");
         let newEntities = [];
-        if (marginalRes.ok) {
-            const marginalData = await marginalRes.json();
-            newEntities = marginalData.new_entities || [];
+        const marginalRes = await sendBgMessage("bg_marginal_risk", { payload: analysisData });
+        if (marginalRes.ok && marginalRes.data) {
+            newEntities = marginalRes.data.newly_introduced_entities || [];
         }
 
-        // Save everything for the popup and future page reloads
+        // Cache result for popup and reloads
         chrome.storage.local.set({
             cachedAnalysis: {
                 url: window.location.hostname,
@@ -275,37 +233,45 @@ async function initActiveLoginShield() {
             }
         });
 
-        // 4. In-Page Warning UI Update
-        if (analysisData.risk > 50 || newEntities.length > 0) {
-            let msg = `🚨 High Privacy Risk (Score: ${analysisData.risk.toFixed(1)}).`;
-            if (newEntities.length > 0) {
-                msg += ` Exposing new data (${newEntities.join(', ')}).`;
-            }
-            updateShieldUI(msg, "red");
-        } else {
-            updateShieldUI(`✅ Safe Login (Score: ${analysisData.risk.toFixed(1)}). Limited data exposure.`, "green");
-        }
-
+        showVerdict(analysisData, newEntities);
     } catch (e) {
-        console.error(e);
-        updateShieldUI("⚠️ ClauseGuard could not analyze the background policy.", "orange");
+        updateShieldUI("⚠️ Could not complete background scan of privacy policy.", "orange");
     }
 }
 
-function findPrivacyPolicyLink() {
-    const links = Array.from(document.querySelectorAll('a'));
-    for (let a of links) {
-        const text = a.innerText.toLowerCase();
-        if (text.includes("privacy") || text.includes("terms of service") || text.includes("legal")) {
-            return a;
-        }
+function showVerdict(analysisData, newEntities) {
+    const score = Number(analysisData.risk_score ?? analysisData.risk ?? 0);
+    const category = analysisData.risk_category || "Inconclusive";
+    const coverage = analysisData.coverage || {};
+
+    let style = "orange";
+    let icon = "⚠️";
+    if (category === "Low") { style = "green"; icon = "✓"; }
+    else if (category === "Moderate") { style = "orange"; icon = "⚠️"; }
+    else if (category === "High" || category === "Very High") { style = "red"; icon = "🚨"; }
+    else { style = "orange"; icon = "❔"; }
+
+    if (newEntities.length > 0 && style === "green") style = "orange";
+
+    let note = "";
+    if (coverage.status === "partial") note += " (Partial policy analysed)";
+    if (coverage.status === "insufficient") note += " (Insufficient text)";
+
+    let newText = "";
+    if (newEntities.length > 0) {
+        newText = ` | New types: ${newEntities.slice(0, 3).join(', ')}`;
     }
-    return null;
+
+    updateShieldUI(
+        `${icon} Privacy Risk: ${category} (${score.toFixed(0)}/100)${note}${newText}`,
+        style
+    );
 }
 
 let shieldBanner = null;
 
 function injectShieldUI() {
+    if (shieldBanner) return;
     const passwordField = document.querySelector('input[type="password"]');
     
     shieldBanner = document.createElement("div");
@@ -316,18 +282,17 @@ function injectShieldUI() {
     shieldBanner.style.color = "#334155";
     shieldBanner.style.padding = "10px 14px";
     shieldBanner.style.borderRadius = "8px";
-    shieldBanner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    shieldBanner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     shieldBanner.style.fontWeight = "600";
-    shieldBanner.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
+    shieldBanner.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
     shieldBanner.style.border = "1px solid #e2e8f0";
     shieldBanner.style.fontSize = "13px";
     shieldBanner.style.marginTop = "8px";
     shieldBanner.style.marginBottom = "12px";
     shieldBanner.style.zIndex = "999999";
-    shieldBanner.style.transition = "all 0.3s ease-in-out";
     shieldBanner.style.width = "100%";
     shieldBanner.style.boxSizing = "border-box";
-    shieldBanner.innerHTML = `<span style="margin-right: 8px;">🛡️</span> <span>ClauseGuard: Scanning Login Risks...</span>`;
+    shieldBanner.innerHTML = `<span style="margin-right: 8px;">🛡️</span> <span>ClauseGuard: Detecting Login Risks...</span>`;
     
     if (passwordField && passwordField.parentNode) {
         passwordField.parentNode.insertBefore(shieldBanner, passwordField);
@@ -342,7 +307,14 @@ function injectShieldUI() {
 
 function updateShieldUI(text, colorType) {
     if (!shieldBanner) return;
-    shieldBanner.innerHTML = `<span style="margin-right: 8px;">🛡️</span> <span>${text}</span>`;
+    shieldBanner.textContent = "";
+    const shieldIcon = document.createElement("span");
+    shieldIcon.style.marginRight = "8px";
+    shieldIcon.textContent = "🛡️";
+    const shieldText = document.createElement("span");
+    shieldText.textContent = text;
+    shieldBanner.appendChild(shieldIcon);
+    shieldBanner.appendChild(shieldText);
     
     if (colorType === "red") {
         shieldBanner.style.backgroundColor = "#fef2f2";
@@ -363,5 +335,5 @@ function updateShieldUI(text, colorType) {
     }
 }
 
-// Run the shield when the page loads
+// Run shield on page load
 setTimeout(initActiveLoginShield, 1000);

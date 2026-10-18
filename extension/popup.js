@@ -1,33 +1,66 @@
+// ClauseGuard Popup Controller
+// 4-Question UX Redesign & Complete Scanning Engine
+
+const BACKEND_URL = "http://127.0.0.1:5000";
+const MAX_POLICY_CHARS = 50000;
+
 document.addEventListener('DOMContentLoaded', () => {
     let currentAnalysisResult = null;
-    const siteNameSpan = document.getElementById('site-name');
+    let currentActiveTab = null;
+    let currentHostname = "";
+    let isCurrentSavedInPortfolio = false;
+    let portfolioServices = [];
+
+    // Elements
+    const siteNameEl = document.getElementById('site-name');
+    const portfolioBadge = document.getElementById('portfolio-badge');
+    const scanBadge = document.getElementById('scan-badge');
+    const lastScannedTimeEl = document.getElementById('last-scanned-time');
+    const policyLinkContainer = document.getElementById('policy-link-container');
+    const policyLink = document.getElementById('policy-link');
+
     const analyzeBtn = document.getElementById('analyze-btn');
+    const togglePasteBtn = document.getElementById('toggle-paste-btn');
+    const pasteSection = document.getElementById('paste-section');
+    const pasteAnalyzeBtn = document.getElementById('paste-analyze-btn');
+    const pasteTextArea = document.getElementById('paste-text');
+
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
+    const apiModeEl = document.getElementById('api-mode');
+
+    const saveBtn = document.getElementById('save-btn');
+    const saveStatus = document.getElementById('save-status');
+    const openDashBtn = document.getElementById('open-dash-btn');
+
+    const compareTargetSelect = document.getElementById('compare-target');
+    const compareBtn = document.getElementById('compare-btn');
+    const compareResultsDiv = document.getElementById('compare-results');
+
     const toggleClausesBtn = document.getElementById('toggle-clauses-btn');
     const clausesDetailsDiv = document.getElementById('clauses-details');
 
-    // Get current tab info and check for cached analysis
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab && activeTab.url) {
-            try {
-                const url = new URL(activeTab.url);
-                siteNameSpan.textContent = url.hostname;
-                
-                // Check if the Shield already analyzed this
-                chrome.storage.local.get(['cachedAnalysis'], (result) => {
-                    if (result.cachedAnalysis && result.cachedAnalysis.url === url.hostname) {
-                        showStatus("Analyzed automatically by Login Shield.", "success");
-                        displayResults(result.cachedAnalysis.data);
-                        analyzeBtn.style.display = "none";
-                    }
-                });
-            } catch (e) {
-                siteNameSpan.textContent = "Unknown";
-            }
-        }
+    // Setup Accordions for Question Cards
+    document.querySelectorAll('.q-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const bodyId = header.getAttribute('data-toggle');
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const isCollapsed = body.classList.contains('hidden');
+            body.classList.toggle('hidden', !isCollapsed);
+            header.classList.toggle('collapsed', !isCollapsed);
+        });
     });
+
+    // Helper: Escaping HTML
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     function showStatus(msg, type = "info") {
         statusDiv.textContent = msg;
@@ -39,222 +72,673 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.classList.add('hidden');
     }
 
-    function getRiskBand(score) {
-        if (score < 15) return "Low";
-        if (score < 30) return "Moderate";
-        return "High";
+    // Toggle Manual Paste Box
+    if (togglePasteBtn) {
+        togglePasteBtn.addEventListener('click', () => {
+            const isHidden = pasteSection.classList.contains('hidden');
+            pasteSection.classList.toggle('hidden', !isHidden);
+            togglePasteBtn.textContent = isHidden ? "Hide manual text box" : "Paste text manually instead";
+            if (isHidden) pasteTextArea.focus();
+        });
     }
 
+    // Initialize: inspect active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        currentActiveTab = tabs[0];
+        if (!currentActiveTab || !currentActiveTab.url) {
+            siteNameEl.textContent = "Unknown Tab";
+            showStatus("Cannot determine active tab URL.", "warning");
+            analyzeBtn.disabled = true;
+            return;
+        }
+
+        const urlStr = currentActiveTab.url;
+        if (urlStr.startsWith('chrome://') || urlStr.startsWith('edge://') || urlStr.startsWith('about:') || urlStr.startsWith('chrome-extension://')) {
+            siteNameEl.textContent = "Browser Internal Page";
+            portfolioBadge.textContent = "Restricted";
+            portfolioBadge.className = "badge neutral";
+            scanBadge.textContent = "Not Available";
+            scanBadge.className = "badge neutral";
+            showStatus("ClauseGuard cannot scan protected browser internal pages. Navigate to a standard website to analyze its privacy policy.", "info");
+            analyzeBtn.disabled = true;
+            return;
+        }
+
+        try {
+            const urlObj = new URL(urlStr);
+            currentHostname = urlObj.hostname;
+            siteNameEl.textContent = currentHostname;
+        } catch (e) {
+            currentHostname = "Unknown";
+            siteNameEl.textContent = "Unknown";
+        }
+
+        // Check backend service status & portfolio
+        await checkPortfolioStatus(currentHostname);
+        await loadPortfolioList();
+
+        // Check cached analysis in chrome.storage.local
+        chrome.storage.local.get([`analysis_${currentHostname}`, 'cachedAnalysis'], (res) => {
+            const cached = res[`analysis_${currentHostname}`] || 
+                (res.cachedAnalysis && res.cachedAnalysis.url === currentHostname ? res.cachedAnalysis : null);
+
+            if (cached && cached.data) {
+                if (cached.timestamp) {
+                    const d = new Date(cached.timestamp);
+                    lastScannedTimeEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+                }
+                analyzeBtn.textContent = "Re-scan Website";
+                displayResults(cached.data, false);
+            }
+        });
+    });
+
+    // Check if website is saved in portfolio
+    async function checkPortfolioStatus(hostname) {
+        portfolioBadge.textContent = "Checking...";
+        portfolioBadge.className = "badge neutral";
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/service-status?name=${encodeURIComponent(hostname)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.is_saved) {
+                    isCurrentSavedInPortfolio = true;
+                    portfolioBadge.textContent = "✓ In Portfolio";
+                    portfolioBadge.className = "badge saved";
+                    saveBtn.textContent = "Update Portfolio";
+                } else {
+                    isCurrentSavedInPortfolio = false;
+                    portfolioBadge.textContent = "○ Not in Portfolio";
+                    portfolioBadge.className = "badge unsaved";
+                    saveBtn.textContent = "Add to Portfolio";
+                }
+            } else {
+                portfolioBadge.textContent = "○ Not in Portfolio";
+                portfolioBadge.className = "badge unsaved";
+            }
+        } catch (e) {
+            portfolioBadge.textContent = "Offline";
+            portfolioBadge.className = "badge neutral";
+        }
+    }
+
+    // Load list of portfolio services for Quick Compare
+    async function loadPortfolioList() {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/portfolio`);
+            if (res.ok) {
+                const data = await res.json();
+                portfolioServices = data.services || [];
+                populateCompareDropdown();
+            }
+        } catch (e) {
+            console.log("Could not load portfolio list for comparison.");
+        }
+    }
+
+    function populateCompareDropdown() {
+        compareTargetSelect.innerHTML = '<option value="">-- Select a saved service --</option>';
+        portfolioServices.forEach(svc => {
+            const opt = document.createElement('option');
+            opt.value = svc.service_name;
+            opt.textContent = `${svc.service_name} (Risk: ${Math.round(svc.service_score || 0)})`;
+            compareTargetSelect.appendChild(opt);
+        });
+    }
+
+    // Main Scan Action
     analyzeBtn.addEventListener('click', () => {
+        if (!currentActiveTab) return;
         analyzeBtn.disabled = true;
         resultsDiv.classList.add('hidden');
-        showStatus("Extracting page text...", "info");
+        showStatus("Inspecting webpage for privacy policy...", "info");
 
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const activeTab = tabs[0];
-            
-            if (activeTab.url.startsWith('chrome://')) {
-                showStatus("Cannot analyze chrome:// pages.", "error");
+        // Inject content script to inspect DOM
+        chrome.scripting.executeScript({
+            target: { tabId: currentActiveTab.id },
+            files: ['content.js']
+        }, () => {
+            if (chrome.runtime.lastError) {
+                showStatus("Could not access page: " + chrome.runtime.lastError.message, "error");
+                pasteSection.classList.remove('hidden');
                 analyzeBtn.disabled = false;
                 return;
             }
 
-            // Inject content script and ask for text
-            chrome.scripting.executeScript({
-                target: { tabId: activeTab.id },
-                files: ['content.js']
-            }, () => {
-                if (chrome.runtime.lastError) {
-                    showStatus("Failed to inject script: " + chrome.runtime.lastError.message, "error");
+            chrome.tabs.sendMessage(currentActiveTab.id, { action: "extract_text" }, async (pageData) => {
+                if (chrome.runtime.lastError || !pageData) {
+                    showStatus("Unable to read page automatically. Paste policy text below to analyze.", "warning");
+                    pasteSection.classList.remove('hidden');
                     analyzeBtn.disabled = false;
                     return;
                 }
 
-                chrome.tabs.sendMessage(activeTab.id, { action: "extract_text" }, (response) => {
-                    if (chrome.runtime.lastError || !response) {
-                        showStatus("ClauseGuard couldn't analyze this page. Please refresh and try again.", "error");
-                        analyzeBtn.disabled = false;
-                        return;
-                    }
+                // Show policy link if detected
+                if (pageData.policyLink && pageData.policyLink.href) {
+                    policyLink.href = pageData.policyLink.href;
+                    policyLink.textContent = `Open ${pageData.policyLink.text || 'Privacy Policy'} ↗`;
+                    policyLinkContainer.classList.remove('hidden');
+                }
 
-                    if (!response.text || response.text.trim().length === 0) {
-                        showStatus("No readable text found on this page.", "error");
-                        analyzeBtn.disabled = false;
-                        return;
-                    }
-
-                    if (response.error && response.blockedBySecurity) {
-                        showStatus(response.message, "error");
-                        analyzeBtn.disabled = false;
-                        return;
-                    }
-
-                    if (!response.isLikelyPrivacyPolicy) {
-                        if (!confirm("This page does not appear to be a privacy policy. Do you want to scan it anyway?")) {
-                            hideStatus();
-                            analyzeBtn.disabled = false;
-                            return;
-                        }
-                    }
-
-                    if (response.wasAutoDiscovered) {
-                        showStatus("Found hidden policy! Sending to background...", "info");
-                    } else if (response.truncated) {
-                        showStatus("Sending top 15k characters to background...", "warning");
-                    } else {
-                        showStatus("Sending to ClauseGuard background...", "info");
-                    }
-
-                    // Delegate the fetch to the content script so it doesn't die if popup closes
-                    chrome.tabs.sendMessage(activeTab.id, { action: "run_backend_analysis", data: response }, (backendRes) => {
-                        if (chrome.runtime.lastError || !backendRes) {
-                            showStatus("Analysis was sent to background. Reopen popup soon to check results!", "info");
-                            return;
-                        }
-                        if (backendRes.status === "error") {
-                            showStatus(`Analysis failed: ${backendRes.error}`, "error");
-                            analyzeBtn.disabled = false;
-                        } else {
-                            displayResults(backendRes.data);
-                        }
+                // Case 1: Currently on a Privacy Policy page
+                if (pageData.isLikelyPrivacyPolicy && pageData.text && pageData.text.length > 200) {
+                    showStatus("Analysing current privacy policy page...", "info");
+                    await runAnalysis({
+                        text: pageData.text,
+                        url: pageData.url,
+                        title: pageData.title,
+                        truncated: pageData.truncated
                     });
-                });
+                    return;
+                }
+
+                // Case 2: Discovered a linked privacy policy
+                if (pageData.policyLink && pageData.policyLink.href) {
+                    const targetLink = pageData.policyLink;
+                    showStatus(`Discovered privacy policy link: ${targetLink.text}. Fetching policy text in background...`, "info");
+
+                    try {
+                        const proxyRes = await fetch(`${BACKEND_URL}/api/proxy-fetch`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ url: targetLink.href })
+                        });
+
+                        if (proxyRes.ok) {
+                            const proxyData = await proxyRes.json();
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(proxyData.html, "text/html");
+
+                            const elementsToRemove = doc.querySelectorAll('script, style, nav, footer, header, noscript, iframe');
+                            elementsToRemove.forEach(el => el.remove());
+
+                            let policyText = (doc.body.innerText || "").replace(/\s+/g, ' ').trim();
+                            let truncated = false;
+                            if (policyText.length > MAX_POLICY_CHARS) {
+                                policyText = policyText.substring(0, MAX_POLICY_CHARS);
+                                truncated = true;
+                            }
+
+                            if (policyText.length < 200) {
+                                showStatus("Discovered policy page had very little readable text. Please open it directly or paste text below.", "warning");
+                                pasteSection.classList.remove('hidden');
+                                analyzeBtn.disabled = false;
+                                return;
+                            }
+
+                            showStatus("Policy fetched successfully. Analysing with ClauseGuard engine...", "info");
+                            await runAnalysis({
+                                text: policyText,
+                                url: targetLink.href,
+                                title: pageData.title,
+                                truncated: truncated
+                            });
+                        } else {
+                            // Proxy blocked by Cloudflare/anti-bot firewall
+                            showStatus("🛡️ Website anti-bot protection blocked the background scan. Click 'Open Privacy Policy Page ↗' to scan it directly, or paste text below.", "warning");
+                            policyLinkContainer.classList.remove('hidden');
+                            pasteSection.classList.remove('hidden');
+                            analyzeBtn.disabled = false;
+                        }
+                    } catch (err) {
+                        showStatus("Background fetch failed. Please open the privacy policy link directly or paste text below.", "warning");
+                        pasteSection.classList.remove('hidden');
+                        analyzeBtn.disabled = false;
+                    }
+                    return;
+                }
+
+                // Case 3: Neither on policy nor link discovered
+                showStatus("No privacy policy link was automatically detected on this page. If this service has a policy, open it or paste the text below.", "warning");
+                pasteSection.classList.remove('hidden');
+                analyzeBtn.disabled = false;
             });
         });
     });
 
-    function displayResults(data) {
+    // Manual Paste Analysis
+    if (pasteAnalyzeBtn) {
+        pasteAnalyzeBtn.addEventListener('click', async () => {
+            const pastedText = pasteTextArea.value.trim();
+            if (!pastedText) {
+                showStatus("Please paste privacy policy text before analysing.", "warning");
+                return;
+            }
+
+            pasteAnalyzeBtn.disabled = true;
+            showStatus("Analysing pasted policy text...", "info");
+
+            const isTruncated = pastedText.length > MAX_POLICY_CHARS;
+            const sendText = pastedText.substring(0, MAX_POLICY_CHARS);
+
+            await runAnalysis({
+                text: sendText,
+                url: currentActiveTab ? currentActiveTab.url : "",
+                title: currentActiveTab ? currentActiveTab.title : "",
+                truncated: isTruncated,
+                source: "pasted"
+            });
+
+            pasteAnalyzeBtn.disabled = false;
+            pasteSection.classList.add('hidden');
+        });
+    }
+
+    // Execute backend analysis call
+    async function runAnalysis(payload) {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/analyze-policy`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}`);
+            }
+
+            // Save to chrome storage
+            const now = Date.now();
+            chrome.storage.local.set({
+                [`analysis_${currentHostname}`]: {
+                    url: currentHostname,
+                    timestamp: now,
+                    data: data
+                },
+                cachedAnalysis: {
+                    url: currentHostname,
+                    timestamp: now,
+                    data: data,
+                    newEntities: []
+                }
+            });
+
+            // Update scan time display
+            const d = new Date(now);
+            lastScannedTimeEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+            analyzeBtn.textContent = "Re-scan Website";
+
+            displayResults(data, true);
+        } catch (e) {
+            showStatus(`Analysis failed: ${e.message}`, "error");
+            pasteSection.classList.remove('hidden');
+        } finally {
+            analyzeBtn.disabled = false;
+        }
+    }
+
+    // Render results in the 4-Question UX
+    function displayResults(data, isNewScan = false) {
+        currentAnalysisResult = data;
         hideStatus();
-        analyzeBtn.disabled = false;
         resultsDiv.classList.remove('hidden');
 
-        const score = data.risk || 0;
-        document.getElementById('risk-score').textContent = score.toFixed(1);
-        
-        const band = getRiskBand(score);
+        // Mode badge in header
+        if (apiModeEl) {
+            apiModeEl.textContent = data.mode || "MOCK/DEV";
+            apiModeEl.className = `conn ${(data.mode || '').includes("GEMINI") ? "live" : "mock"}`;
+        }
+
+        // Coverage badge on site card
+        const coverage = data.coverage || {};
+        if (coverage.status === "complete") {
+            scanBadge.textContent = "✓ Complete Scan";
+            scanBadge.className = "badge complete";
+        } else if (coverage.status === "partial") {
+            scanBadge.textContent = "⚠️ Partial Scan";
+            scanBadge.className = "badge partial";
+        } else {
+            scanBadge.textContent = "⚠️ Insufficient";
+            scanBadge.className = "badge insufficient";
+        }
+
+        // Check if service is saved in portfolio
+        if (data.is_saved_in_portfolio) {
+            isCurrentSavedInPortfolio = true;
+            portfolioBadge.textContent = "✓ In Portfolio";
+            portfolioBadge.className = "badge saved";
+            saveBtn.textContent = "Update Portfolio";
+        }
+
+        // ----------------------------------------------------
+        // QUESTION 1: What data is collected?
+        // ----------------------------------------------------
+        const q1Chips = document.getElementById('collection-chips');
+        const q1List = document.getElementById('collection-findings-list');
+        const q1Sub = document.getElementById('q1-sub');
+
+        q1Chips.innerHTML = '';
+        q1List.innerHTML = '';
+
+        const entities = data.canonical_entities || [];
+        q1Sub.textContent = entities.length > 0 
+            ? `${entities.length} data categories identified in policy` 
+            : 'No data categories identified';
+
+        if (entities.length === 0) {
+            q1List.innerHTML = '<div class="empty-msg">No specific personal data collection categories were identified in the analysed text.</div>';
+        } else {
+            // Render chips
+            entities.forEach(ent => {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = ent;
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('#collection-chips .chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    // Scroll to or highlight matching finding
+                    const findingEl = document.getElementById(`finding-ent-${ent.replace(/\s+/g, '-')}`);
+                    if (findingEl) {
+                        findingEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        findingEl.style.boxShadow = '0 0 0 2px var(--mark)';
+                        setTimeout(() => { findingEl.style.boxShadow = ''; }, 1500);
+                    }
+                });
+                q1Chips.appendChild(chip);
+            });
+
+            // Render findings with evidence
+            const collectionFindings = data.collection_findings || entities.map(e => ({
+                entity: e,
+                evidence: (data.entity_sources && data.entity_sources[e] && data.entity_sources[e][0]) || null
+            }));
+
+            collectionFindings.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'finding-item';
+                div.id = `finding-ent-${item.entity.replace(/\s+/g, '-')}`;
+
+                const evidenceHtml = item.evidence 
+                    ? `<button class="evidence-btn" type="button">Show policy excerpt ▾</button>
+                       <div class="evidence-quote hidden">"${escapeHtml(item.evidence)}"</div>`
+                    : `<div class="hint" style="margin-top:2px;">Extracted from context in policy text.</div>`;
+
+                div.innerHTML = `
+                    <div class="finding-head">
+                        <span class="finding-kind">${escapeHtml(item.entity)}</span>
+                    </div>
+                    ${evidenceHtml}
+                `;
+
+                const btn = div.querySelector('.evidence-btn');
+                const quote = div.querySelector('.evidence-quote');
+                if (btn && quote) {
+                    btn.addEventListener('click', () => {
+                        const isHidden = quote.classList.contains('hidden');
+                        quote.classList.toggle('hidden', !isHidden);
+                        btn.textContent = isHidden ? "Hide policy excerpt ▴" : "Show policy excerpt ▾";
+                    });
+                }
+                q1List.appendChild(div);
+            });
+        }
+
+        // ----------------------------------------------------
+        // QUESTION 2: Who is it shared with?
+        // ----------------------------------------------------
+        const q2List = document.getElementById('sharing-findings-list');
+        const q2Sub = document.getElementById('q2-sub');
+        q2List.innerHTML = '';
+
+        const sharingFindings = data.sharing_findings || [];
+        q2Sub.textContent = sharingFindings.length > 0 
+            ? `${sharingFindings.length} third-party disclosure practices identified`
+            : 'Not established in policy text';
+
+        if (sharingFindings.length === 0) {
+            q2List.innerHTML = '<div class="empty-msg">Recipients and third-party sharing: Not established in the analysed policy text.</div>';
+        } else {
+            sharingFindings.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'finding-item';
+
+                const isSell = (item.kind || '').toLowerCase().includes('sell');
+                const kindClass = isSell ? 'finding-kind sell' : 'finding-kind';
+
+                div.innerHTML = `
+                    <div class="finding-head">
+                        <span class="${kindClass}">${escapeHtml(item.kind || 'Third-Party Disclosure')}</span>
+                    </div>
+                    <div class="finding-summary">${escapeHtml(item.summary || 'States disclosure to third parties.')}</div>
+                    <button class="evidence-btn" type="button">Show clause excerpt ▾</button>
+                    <div class="evidence-quote hidden">"${escapeHtml(item.clause_text || '')}"</div>
+                `;
+
+                const btn = div.querySelector('.evidence-btn');
+                const quote = div.querySelector('.evidence-quote');
+                if (btn && quote) {
+                    btn.addEventListener('click', () => {
+                        const isHidden = quote.classList.contains('hidden');
+                        quote.classList.toggle('hidden', !isHidden);
+                        btn.textContent = isHidden ? "Hide clause excerpt ▴" : "Show clause excerpt ▾";
+                    });
+                }
+                q2List.appendChild(div);
+            });
+        }
+
+        // ----------------------------------------------------
+        // QUESTION 3: What can I control?
+        // ----------------------------------------------------
+        const q3List = document.getElementById('control-findings-list');
+        const q3Sub = document.getElementById('q3-sub');
+        q3List.innerHTML = '';
+
+        const controlFindings = data.control_findings || [];
+        q3Sub.textContent = controlFindings.length > 0 
+            ? `${controlFindings.length} documented user privacy controls` 
+            : 'Not established in policy text';
+
+        if (controlFindings.length === 0) {
+            q3List.innerHTML = '<div class="empty-msg">User settings and opt-outs: Not established in the analysed policy text.</div>';
+        } else {
+            controlFindings.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'finding-item';
+
+                div.innerHTML = `
+                    <div class="finding-head">
+                        <span class="finding-kind">${escapeHtml(item.kind || 'User Control')}</span>
+                    </div>
+                    <div class="finding-summary">${escapeHtml(item.summary || 'Documented privacy control mechanism.')}</div>
+                    <button class="evidence-btn" type="button">Show policy instruction ▾</button>
+                    <div class="evidence-quote hidden">"${escapeHtml(item.clause_text || '')}"</div>
+                `;
+
+                const btn = div.querySelector('.evidence-btn');
+                const quote = div.querySelector('.evidence-quote');
+                if (btn && quote) {
+                    btn.addEventListener('click', () => {
+                        const isHidden = quote.classList.contains('hidden');
+                        quote.classList.toggle('hidden', !isHidden);
+                        btn.textContent = isHidden ? "Hide policy instruction ▴" : "Show policy instruction ▾";
+                    });
+                }
+                q3List.appendChild(div);
+            });
+        }
+
+        // ----------------------------------------------------
+        // QUESTION 4: Has anything changed?
+        // ----------------------------------------------------
+        const q4Box = document.getElementById('change-findings-box');
+        const q4Sub = document.getElementById('q4-sub');
+        q4Box.innerHTML = '';
+
+        const prev = data.previous_scan;
+        if (prev) {
+            q4Sub.textContent = `Compared with saved version (${prev.service_name})`;
+            const currentScore = Math.round(Number(data.risk_score ?? data.risk ?? 0));
+            const prevScore = Math.round(Number(prev.service_score ?? 0));
+            const scoreDiff = currentScore - prevScore;
+
+            const prevEntities = prev.entities || [];
+            const currentEntities = data.canonical_entities || [];
+
+            const newEntities = currentEntities.filter(e => !prevEntities.includes(e));
+            const removedEntities = prevEntities.filter(e => !currentEntities.includes(e));
+
+            let html = '';
+            if (scoreDiff > 0) {
+                html += `<div class="change-item alert">⚠️ Overall risk score increased by +${scoreDiff} points (from ${prevScore} to ${currentScore}/100).</div>`;
+            } else if (scoreDiff < 0) {
+                html += `<div class="change-item safe">✓ Overall risk score decreased by ${scoreDiff} points (from ${prevScore} to ${currentScore}/100).</div>`;
+            } else {
+                html += `<div class="change-item">Overall risk score unchanged (${currentScore}/100).</div>`;
+            }
+
+            if (newEntities.length > 0) {
+                html += `<div class="change-item alert">⚠️ Newly introduced data types: <b>${escapeHtml(newEntities.join(', '))}</b></div>`;
+            } else {
+                html += `<div class="change-item">No new data categories introduced.</div>`;
+            }
+
+            if (removedEntities.length > 0) {
+                html += `<div class="change-item safe">No longer stated as collected: ${escapeHtml(removedEntities.join(', '))}</div>`;
+            }
+
+            const currentClauseCount = (data.clauses || []).length;
+            const prevClauseCount = prev.clause_count || 0;
+            const clauseDiff = currentClauseCount - prevClauseCount;
+            html += `<div class="change-item">Policy clauses: ${currentClauseCount} (${clauseDiff >= 0 ? '+' : ''}${clauseDiff} compared to saved version).</div>`;
+
+            q4Box.innerHTML = html;
+        } else {
+            q4Sub.textContent = 'First recorded scan for this website';
+            q4Box.innerHTML = '<div class="empty-msg">This is the first recorded scan for this service. Future scans will display any policy modifications and permission changes here.</div>';
+        }
+
+        // ----------------------------------------------------
+        // Secondary Score & Audit Summary
+        // ----------------------------------------------------
+        const scoreVal = Number(data.risk_score ?? data.risk ?? 0);
+        document.getElementById('risk-score').textContent = scoreVal.toFixed(0);
+
+        const category = data.risk_category || 'Inconclusive';
         const bandEl = document.getElementById('risk-band');
         if (bandEl) {
-            bandEl.textContent = band;
-            bandEl.className = `band ${band}`;
+            bandEl.textContent = category;
+            bandEl.className = `band ${category.replace(/\s+/g, '')}`;
         }
 
         const gaugeFill = document.getElementById('gauge-fill');
         if (gaugeFill) {
-            const pct = Math.min(100, Math.round((score / 40) * 100));
+            const pct = Math.min(100, Math.max(0, Math.round(scoreVal)));
             gaugeFill.style.width = `${pct}%`;
         }
 
-        const modeText = document.getElementById('mode-text');
-        const apiModeTop = document.getElementById('api-mode');
-        if (modeText) modeText.textContent = data.mode;
-        if (apiModeTop) {
-            apiModeTop.textContent = data.mode;
-            apiModeTop.className = `conn ${data.mode.includes("GEMINI") ? "live" : "mock"}`;
+        // Coverage Box
+        const coverageEl = document.getElementById('coverage-note');
+        if (coverageEl) {
+            let covHtml = '';
+            if (coverage.status === 'partial') {
+                covHtml = `
+                    <div class="cov-status" style="color:var(--warning);">⚠️ Partial Analysis</div>
+                    <div>Policy text exceeded 50,000 characters. Only the first 50k characters were analysed (${coverage.clauses_found ?? 0} clauses identified).</div>
+                `;
+            } else if (coverage.status === 'insufficient') {
+                covHtml = `
+                    <div class="cov-status" style="color:var(--alert);">⚠️ Insufficient Evidence</div>
+                    <div>Less than 300 characters or no privacy clauses were found. The score is deemed Inconclusive.</div>
+                `;
+            } else {
+                covHtml = `
+                    <div class="cov-status" style="color:var(--safe);">✓ Complete Scan</div>
+                    <div>Analysed ${coverage.analysed_chars ?? '?'} characters. Extracted ${coverage.clauses_found ?? 0} privacy clauses.</div>
+                `;
+            }
+            if (coverage.is_demo) {
+                covHtml += `<div class="hint" style="margin-top:2px;">⚡ Evaluated via local offline demo model.</div>`;
+            }
+            coverageEl.innerHTML = covHtml;
         }
 
-        // Detected entities as chips
-        const entitiesList = document.getElementById('entities-list');
-        entitiesList.innerHTML = '';
-        if (!data.canonical_entities || data.canonical_entities.length === 0) {
-            entitiesList.innerHTML = '<span class="chip">None detected</span>';
-        } else {
-            data.canonical_entities.forEach(ent => {
-                const chip = document.createElement('span');
-                chip.className = 'chip';
-                chip.textContent = ent;
-                entitiesList.appendChild(chip);
-            });
-        }
-
-        document.getElementById('clause-count').textContent = data.clauses.length;
-
-        // Clauses list
+        // Extracted Clauses
+        const clauses = data.clauses || [];
+        document.getElementById('clause-count').textContent = clauses.length;
         clausesDetailsDiv.innerHTML = '';
-        data.clauses.forEach(c => {
+        clauses.forEach(c => {
             const card = document.createElement('div');
             card.className = 'clause-card';
-            
-            let text = c.text;
-            if (text.length > 140) {
-                text = text.substring(0, 140) + '...';
-            }
-
-            const risk = ((c.severity_score || 0) + (c.specificity_score || 0)).toFixed(1);
+            const sev = Math.min(5, Math.max(0, Number(c.severity_score) || 0));
+            const spec = Math.min(5, Math.max(0, Number(c.specificity_score) || 0));
+            const cRisk = Math.round(100 * (sev / 5) * (spec / 5));
 
             card.innerHTML = `
-                <div class="clause-text">"${text}"</div>
+                <div class="clause-quote">"${escapeHtml(c.text || '')}"</div>
                 <div class="clause-meta">
-                    <span>${c.risk_category || 'General Risk'}</span>
-                    <span>Risk: <b>${risk}</b></span>
+                    <span>${escapeHtml(c.risk_category || 'Identified Clause')}</span>
+                    <span>Risk: <b>${cRisk}/100</b></span>
                 </div>
             `;
             clausesDetailsDiv.appendChild(card);
         });
 
-        currentAnalysisResult = data;
-        const saveBtn = document.getElementById('save-btn');
-        const saveStatus = document.getElementById('save-status');
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Add to Portfolio";
-        saveStatus.classList.add('hidden');
-        
-        // Show compare section and fetch portfolio
-        const compareSection = document.getElementById('compare-section');
-        if (compareSection) {
-            compareSection.style.display = 'block';
-            fetchPortfolio();
-        }
+        // Toggle clauses list
+        toggleClausesBtn.onclick = () => {
+            const isHidden = clausesDetailsDiv.classList.contains('hidden');
+            clausesDetailsDiv.classList.toggle('hidden', !isHidden);
+            toggleClausesBtn.textContent = isHidden ? "Hide all clauses" : "View all clauses";
+        };
     }
 
-    async function fetchPortfolio() {
-        try {
-            const res = await fetch("http://127.0.0.1:5000/api/portfolio");
-            if (res.ok) {
-                const data = await res.json();
-                const dropdown = document.getElementById('compare-target');
-                dropdown.innerHTML = '<option value="">-- Select website --</option>';
-                if (data.services) {
-                    data.services.forEach(svc => {
-                        const opt = document.createElement('option');
-                        opt.value = svc.service_name;
-                        opt.textContent = svc.service_name;
-                        dropdown.appendChild(opt);
-                    });
+    // Save to Portfolio Action
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            if (!currentAnalysisResult) return;
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+            saveStatus.classList.add('hidden');
+
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/save-service`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(currentAnalysisResult)
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || `HTTP ${res.status}`);
                 }
+
+                isCurrentSavedInPortfolio = true;
+                portfolioBadge.textContent = "✓ In Portfolio";
+                portfolioBadge.className = "badge saved";
+                saveBtn.textContent = "Added to Portfolio";
+                saveStatus.textContent = "Successfully saved to your privacy portfolio!";
+                saveStatus.className = "status success";
+                saveStatus.classList.remove('hidden');
+
+                // Refresh comparison list
+                loadPortfolioList();
+            } catch (err) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Retry Add";
+                saveStatus.textContent = `Save failed: ${err.message}`;
+                saveStatus.className = "status error";
+                saveStatus.classList.remove('hidden');
             }
-        } catch (e) {
-            console.log("Could not load portfolio for comparison.");
-        }
+        });
     }
 
-    toggleClausesBtn.addEventListener('click', () => {
-        if (clausesDetailsDiv.classList.contains('hidden')) {
-            clausesDetailsDiv.classList.remove('hidden');
-            toggleClausesBtn.textContent = "Hide Details";
-        } else {
-            clausesDetailsDiv.classList.add('hidden');
-            toggleClausesBtn.textContent = "View Details";
-        }
-    });
-
-    const compareBtn = document.getElementById('compare-btn');
-    const compareResults = document.getElementById('compare-results');
-
+    // Quick Compare Action
     if (compareBtn) {
         compareBtn.addEventListener('click', async () => {
             if (!currentAnalysisResult) return;
-            const target = document.getElementById('compare-target').value;
+            const target = compareTargetSelect.value;
             if (!target) {
-                compareResults.innerHTML = "<span style='color:var(--alert);'>Please select a website.</span>";
-                compareResults.classList.remove('hidden');
+                compareResultsDiv.innerHTML = '<span style="color:var(--alert);">Please select a website from the dropdown.</span>';
+                compareResultsDiv.classList.remove('hidden');
                 return;
             }
-            
+
             compareBtn.disabled = true;
-            compareBtn.textContent = "Wait...";
-            
+            compareBtn.textContent = "Comparing...";
+
             try {
-                const res = await fetch("http://127.0.0.1:5000/api/quick-compare", {
+                const res = await fetch(`${BACKEND_URL}/api/quick-compare`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -262,29 +746,38 @@ document.addEventListener('DOMContentLoaded', () => {
                         target: target
                     })
                 });
-                
-                if (!res.ok) throw new Error("Comparison failed");
-                const data = await res.json();
-                
-                let overlapText = data.overlap.length > 0 ? data.overlap.join(", ") : "None";
-                let newText = data.new.length > 0 ? data.new.join(", ") : "None";
-                
-                let html = `
-                    <div style="margin-bottom: 6px;"><b>⚖️ Overlap with ${target}:</b> ${data.overlap.length} entities</div>
-                    <div style="color: var(--ink-3); font-size: 11.5px; margin-bottom: 10px;">${overlapText}</div>
+
+                if (!res.ok) throw new Error("Comparison request failed");
+                const comp = await res.json();
+
+                const overlap = comp.overlap || [];
+                const newTypes = comp.new || [];
+
+                const overlapText = overlap.length > 0 ? overlap.map(escapeHtml).join(", ") : "None";
+                const newText = newTypes.length > 0 ? newTypes.map(escapeHtml).join(", ") : "None";
+
+                const verdictText = newTypes.length > 0
+                    ? `⚠️ Adds ${newTypes.length} data types not collected by ${escapeHtml(target)}.`
+                    : `No new data types beyond what ${escapeHtml(target)} collects.`;
+
+                compareResultsDiv.innerHTML = `
+                    <div style="margin-bottom: 5px;"><b>⚖️ Overlapping permissions with ${escapeHtml(target)}:</b> ${overlap.length} types</div>
+                    <div style="color: var(--ink-3); font-size: 11px; margin-bottom: 8px;">${overlapText}</div>
                     
-                    <div style="margin-bottom: 6px;"><b>🚨 NEW Risks added:</b> ${data.new.length} entities</div>
-                    <div style="color: ${data.new.length > 0 ? 'var(--alert)' : 'var(--safe)'}; font-size: 11.5px; margin-bottom: 8px;">${newText}</div>
+                    <div style="margin-bottom: 5px;"><b>🚨 Newly introduced data types:</b> ${newTypes.length} types</div>
+                    <div style="color: ${newTypes.length > 0 ? 'var(--alert)' : 'var(--safe)'}; font-size: 11px; margin-bottom: 8px;">${newText}</div>
                     
-                    <div style="font-weight: 700; color: ${data.new.length > 0 ? 'var(--alert)' : 'var(--safe)'}; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px;">
-                        ${data.new.length > 0 ? '⚠️ Warning: New data types exposed!' : '✅ Safe: No new data types exposed.'}
+                    <div style="font-weight: 700; color: ${newTypes.length > 0 ? 'var(--alert)' : 'var(--safe)'}; border-top: 1px solid var(--line); padding-top: 6px;">
+                        ${verdictText}
+                    </div>
+                    <div class="hint" style="margin-top: 4px; font-style: italic;">
+                        Comparison reflects stated policy permissions and does not imply data transfer between services.
                     </div>
                 `;
-                compareResults.innerHTML = html;
-                compareResults.classList.remove('hidden');
+                compareResultsDiv.classList.remove('hidden');
             } catch (e) {
-                compareResults.innerHTML = "<span style='color:var(--alert);'>Error comparing websites.</span>";
-                compareResults.classList.remove('hidden');
+                compareResultsDiv.innerHTML = '<span style="color:var(--alert);">Error executing comparison.</span>';
+                compareResultsDiv.classList.remove('hidden');
             } finally {
                 compareBtn.disabled = false;
                 compareBtn.textContent = "Compare";
@@ -292,47 +785,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const saveBtn = document.getElementById('save-btn');
-    const saveStatus = document.getElementById('save-status');
-    
-    if (saveBtn) {
-        saveBtn.addEventListener('click', async () => {
-            if (!currentAnalysisResult) return;
-            
-            saveBtn.disabled = true;
-            saveBtn.textContent = "Saving...";
-            saveStatus.classList.add('hidden');
-            
-            try {
-                const res = await fetch("http://127.0.0.1:5000/api/save-service", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(currentAnalysisResult)
-                });
-
-                if (!res.ok) {
-                    let errText = "Failed to save.";
-                    try {
-                        const errObj = await res.json();
-                        errText = errObj.error || errText;
-                    } catch(e) {}
-                    throw new Error(errText);
-                }
-
-                saveBtn.textContent = "Added to Portfolio";
-                saveStatus.textContent = "Successfully added to portfolio!";
-                saveStatus.className = "status success";
-                saveStatus.classList.remove('hidden');
-                
-            } catch (error) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = "Retry Add";
-                saveStatus.textContent = `Error: ${error.message}`;
-                saveStatus.className = "status error";
-                saveStatus.classList.remove('hidden');
-            }
+    // Open Web Dashboard
+    if (openDashBtn) {
+        openDashBtn.addEventListener('click', () => {
+            chrome.tabs.create({ url: BACKEND_URL });
         });
     }
 });

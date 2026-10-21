@@ -68,7 +68,7 @@ def run_ablation_experiment():
             }
         },
         "limitations": [
-            "Dataset is too small (N=14) to represent a true scientific benchmark.",
+            f"Dataset is too small (N={len(examples)}) to represent a true scientific benchmark.",
             "Composite evaluation is explicitly disabled in mock mode to prevent falsifying metrics."
         ]
     }

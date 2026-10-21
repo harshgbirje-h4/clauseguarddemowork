@@ -1,66 +1,191 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ClauseGuard</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="header">
-    <h1>ClauseGuard</h1>
-    <p>Privacy Policy Analyzer</p>
-  </div>
-  
-  <div class="content">
-    <div id="website-info">
-      <strong>Website:</strong> <span id="site-name">Loading...</span>
+  <!-- Header Bar -->
+  <header class="top">
+    <div class="brand"><i></i>ClauseGuard</div>
+    <div class="top-r">
+      <span id="api-mode" class="conn mock">MOCK/DEV</span>
     </div>
+  </header>
 
-    <button id="analyze-btn" class="btn">Analyze Policy</button>
-
-    <div id="status" class="status hidden"></div>
-
-    <div id="results" class="hidden">
-      <div class="risk-section">
-        <h3>Privacy Risk</h3>
-        <div id="risk-score" class="risk-score">0.0</div>
-      </div>
-      
-      <div class="mode-indicator" id="mode-indicator">
-        Mode: <span id="api-mode">UNKNOWN</span>
-      </div>
-
-      <div class="entities-section">
-        <h3>Detected Data:</h3>
-        <ul id="entities-list"></ul>
-      </div>
-
-      <div class="clauses-summary">
-        <p>Clauses extracted: <span id="clause-count">0</span></p>
-        <button id="toggle-clauses-btn" class="btn-small">View Details</button>
-      </div>
-
-      <div id="clauses-details" class="hidden">
-        <!-- Clauses injected here -->
-      </div>
-      
-      <div class="compare-section" id="compare-section" class="hidden" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: none;">
-        <h3 style="font-size: 13px; color: #475569; margin-bottom: 8px;">Compare against saved website:</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <select id="compare-target" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; color: #334155;">
-                <option value="">-- Select website --</option>
-            </select>
-            <button id="compare-btn" class="btn-small" style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer;">Compare</button>
+  <main>
+    <!-- Current Website Overview Card -->
+    <div class="card site-card">
+      <div class="site-header-row">
+        <div>
+          <span class="label-tiny">CURRENT WEBSITE</span>
+          <div id="site-name" class="site-title">Detecting...</div>
         </div>
-        <div id="compare-results" class="hidden" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #334155; line-height: 1.5;"></div>
+        <div class="site-badges">
+          <span id="portfolio-badge" class="badge neutral">Checking...</span>
+          <span id="scan-badge" class="badge neutral">Not Scanned</span>
+        </div>
       </div>
-      
-      <div class="save-section" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-        <button id="save-btn" class="btn">Add to Portfolio</button>
-        <div id="save-status" class="status hidden" style="margin-top: 10px;"></div>
+
+      <div class="site-meta-row">
+        <span class="meta-label">Last scan:</span>
+        <span id="last-scanned-time" class="meta-val">Never</span>
+      </div>
+
+      <div id="policy-link-container" class="policy-link-box hidden">
+        <span class="policy-icon">🔗</span>
+        <a id="policy-link" href="#" target="_blank" class="policy-ext-link">Open Privacy Policy Page ↗</a>
+      </div>
+
+      <div class="scan-actions">
+        <button id="analyze-btn" class="btn primary">Analyze Website</button>
+        <button id="toggle-paste-btn" class="btn-link" type="button">Paste text manually instead</button>
+      </div>
+
+      <!-- Manual Paste Fallback Section (Problem 1) -->
+      <div id="paste-section" class="paste-box hidden">
+        <div class="paste-head">
+          <span class="paste-title">Manual Policy Input</span>
+          <span class="hint">Use this if the policy is blocked by anti-bot firewalls or spread across multiple pages.</span>
+        </div>
+        <textarea id="paste-text" rows="4" placeholder="Paste privacy policy text here..."></textarea>
+        <button id="paste-analyze-btn" class="btn small">Analyze Pasted Text</button>
       </div>
     </div>
-  </div>
+
+    <!-- Live Status / Progress / Error Banner -->
+    <div id="status" class="status hidden" role="status" aria-live="polite"></div>
+
+    <!-- Analysis Results Section (Redesigned around 4 Questions) -->
+    <div id="results" class="hidden">
+      
+      <!-- QUESTION 1: What data is collected? -->
+      <section class="card q-card" id="card-q1">
+        <div class="q-header" data-toggle="q1-body">
+          <div class="q-title-group">
+            <span class="q-num">1</span>
+            <div>
+              <h3 class="q-title">What data is collected?</h3>
+              <p class="q-sub" id="q1-sub">Categories and evidence from policy</p>
+            </div>
+          </div>
+          <span class="q-chevron">▾</span>
+        </div>
+        <div class="q-body" id="q1-body">
+          <div id="collection-chips" class="chips-container"></div>
+          <div id="collection-findings-list" class="findings-list"></div>
+        </div>
+      </section>
+
+      <!-- QUESTION 2: Who is it shared with? -->
+      <section class="card q-card" id="card-q2">
+        <div class="q-header" data-toggle="q2-body">
+          <div class="q-title-group">
+            <span class="q-num">2</span>
+            <div>
+              <h3 class="q-title">Who is it shared with?</h3>
+              <p class="q-sub" id="q2-sub">Recipients, partners, and data sale disclosures</p>
+            </div>
+          </div>
+          <span class="q-chevron">▾</span>
+        </div>
+        <div class="q-body" id="q2-body">
+          <div id="sharing-findings-list" class="findings-list"></div>
+        </div>
+      </section>
+
+      <!-- QUESTION 3: What can I control? -->
+      <section class="card q-card" id="card-q3">
+        <div class="q-header" data-toggle="q3-body">
+          <div class="q-title-group">
+            <span class="q-num">3</span>
+            <div>
+              <h3 class="q-title">What can I control?</h3>
+              <p class="q-sub" id="q3-sub">Documented opt-outs, deletion, and settings</p>
+            </div>
+          </div>
+          <span class="q-chevron">▾</span>
+        </div>
+        <div class="q-body" id="q3-body">
+          <div id="control-findings-list" class="findings-list"></div>
+        </div>
+      </section>
+
+      <!-- QUESTION 4: Has anything changed? -->
+      <section class="card q-card" id="card-q4">
+        <div class="q-header" data-toggle="q4-body">
+          <div class="q-title-group">
+            <span class="q-num">4</span>
+            <div>
+              <h3 class="q-title">Has anything changed?</h3>
+              <p class="q-sub" id="q4-sub">Comparison with previous policy scan</p>
+            </div>
+          </div>
+          <span class="q-chevron">▾</span>
+        </div>
+        <div class="q-body" id="q4-body">
+          <div id="change-findings-box" class="change-box"></div>
+        </div>
+      </section>
+
+      <!-- Secondary Risk Score & Audit Summary -->
+      <section class="card score-card" id="card-score-summary">
+        <div class="score-row">
+          <div>
+            <div class="score-display">
+              <b id="risk-score">0</b><span class="score-denom">/100</span>
+            </div>
+            <span class="score-caption">Overall Privacy Risk (Secondary Metric)</span>
+          </div>
+          <div class="score-badge-box">
+            <span id="risk-band" class="band Inconclusive">Inconclusive</span>
+          </div>
+        </div>
+
+        <div class="gauge" aria-hidden="true">
+          <i id="gauge-fill" style="width: 0%;"></i>
+        </div>
+
+        <div class="score-explanation">
+          Calculated from the severity and specificity of the top 5 highest-risk clauses.
+        </div>
+
+        <!-- Coverage & Audit Transparency (Problem 4) -->
+        <div id="coverage-note" class="coverage-box"></div>
+
+        <!-- Expandable Raw Clauses -->
+        <div class="clauses-toggle-row">
+          <span class="clauses-count-label">Extracted Clauses (<span id="clause-count">0</span>)</span>
+          <button id="toggle-clauses-btn" class="btn-link" type="button">View all clauses</button>
+        </div>
+        <div id="clauses-details" class="clauses-details-box hidden"></div>
+      </section>
+
+      <!-- Quick Portfolio Comparison (Problem 6) -->
+      <section class="card compare-card" id="compare-section">
+        <div class="compare-head">
+          <h4 class="compare-title">Compare with Saved Portfolio Website</h4>
+          <span class="hint">Inspect overlapping data permissions without implying cross-service sharing:</span>
+        </div>
+        <div class="compare-row">
+          <select id="compare-target" class="select-field">
+            <option value="">-- Select a saved service --</option>
+          </select>
+          <button id="compare-btn" class="btn small">Compare</button>
+        </div>
+        <div id="compare-results" class="compare-results-box hidden"></div>
+      </section>
+
+      <!-- Actions -->
+      <div class="portfolio-actions">
+        <button id="save-btn" class="btn primary">Add to Portfolio</button>
+        <button id="open-dash-btn" class="btn ghost">Open Web Dashboard</button>
+      </div>
+      <div id="save-status" class="status hidden" role="status"></div>
+    </div>
+  </main>
 
   <script src="popup.js"></script>
 </body>

@@ -1,27 +1,27 @@
 {
-  "dataset_version": "1.0",
-  "dataset_size": 14,
-  "annotation_status": "MANUALLY_ANNOTATED_DEVELOPMENT_EVALUATION",
+  "dataset_version": "2.0",
+  "dataset_size": 40,
+  "annotation_status": "40_CLAUSE_ANNOTATION",
   "evaluation_mode": "MOCK/DEV",
   "training_evaluation_separation": "Verified zero overlap via DatasetValidator.",
   "approaches": {
     "Naive": {
-      "TP": 7,
+      "TP": 20,
       "TN": 0,
-      "FP": 7,
+      "FP": 20,
       "FN": 0,
       "Precision": 0.5,
       "Recall": 1.0,
       "F1": 0.6666666666666666
     },
     "Prefilter": {
-      "TP": 6,
-      "TN": 4,
-      "FP": 3,
-      "FN": 1,
-      "Precision": 0.6666666666666666,
-      "Recall": 0.8571428571428571,
-      "F1": 0.75
+      "TP": 20,
+      "TN": 12,
+      "FP": 8,
+      "FN": 0,
+      "Precision": 0.7142857142857143,
+      "Recall": 1.0,
+      "F1": 0.8333333333333333
     },
     "Composite": {
       "metrics": "N/A",
@@ -29,7 +29,7 @@
     }
   },
   "limitations": [
-    "Dataset is too small (N=14) to represent a true scientific benchmark.",
+    "Dataset is too small (N=40) to represent a true scientific benchmark.",
     "Composite evaluation is explicitly disabled in mock mode to prevent falsifying metrics."
   ]
 }

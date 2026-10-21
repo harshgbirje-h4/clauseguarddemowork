@@ -1,5 +1,9 @@
-from scoring import ScoringEngine
-from canonicalize import EntityCanonicalizer
+try:
+    from scoring import ScoringEngine
+    from canonicalize import EntityCanonicalizer
+except ImportError:
+    from src.scoring import ScoringEngine
+    from src.canonicalize import EntityCanonicalizer
 
 class MarginalRiskEngine:
     def __init__(self, db_path, w1=1.0, w2=1.0):

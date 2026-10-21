@@ -84,7 +84,7 @@ class TestExtractionPipeline(unittest.TestCase):
         self.extractor.api_key = "test_key"
         res = self.extractor.extract(["Hello"])
         
-        self.assertEqual(res["mode"], "GEMINI")
+        self.assertTrue(res["mode"].startswith("GEMINI"))  # mode includes the model name
         self.assertEqual(len(res["clauses"]), 1)
 
     @patch('urllib.request.urlopen')

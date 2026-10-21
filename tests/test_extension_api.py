@@ -28,7 +28,8 @@ class TestExtensionAPI(unittest.TestCase):
         
         data = json.loads(response.data)
         self.assertIn("service_name", data)
-        self.assertEqual(data["service_name"], "Example Privacy Policy")
+        # The URL domain takes priority over the page title (see dashboard.analyze_policy).
+        self.assertEqual(data["service_name"], "Example")
         self.assertIn("mode", data)
         self.assertIn("clauses", data)
         self.assertIn("canonical_entities", data)

@@ -3,9 +3,10 @@ import json
 import time
 import subprocess
 import os
+import sys
 
-# Start the Flask app
-flask_process = subprocess.Popen(["python", "src/dashboard.py"])
+# Start the Flask app using the active Python interpreter
+flask_process = subprocess.Popen([sys.executable, "src/dashboard.py"])
 time.sleep(3) # wait for server to start
 
 try:
@@ -43,3 +44,6 @@ try:
 finally:
     flask_process.terminate()
     flask_process.wait()
+    sys.path.insert(0, os.path.abspath('src'))
+    from db import reset_db
+    reset_db()

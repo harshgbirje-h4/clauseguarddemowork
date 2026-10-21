@@ -2,7 +2,7 @@
 // 4-Question UX Redesign & Complete Scanning Engine
 
 const BACKEND_URL = "http://127.0.0.1:5000";
-const MAX_POLICY_CHARS = 50000;
+const MAX_POLICY_CHARS = 250000;
 
 document.addEventListener('DOMContentLoaded', () => {
     let currentAnalysisResult = null;
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
             siteNameEl.textContent = "Browser Internal Page";
             portfolioBadge.textContent = "Restricted";
             portfolioBadge.className = "badge neutral";
-            scanBadge.textContent = "Not Available";
+            scanBadge.textContent = "Unsupported";
             scanBadge.className = "badge neutral";
             showStatus("ClauseGuard cannot scan protected browser internal pages. Navigate to a standard website to analyze its privacy policy.", "info");
             analyzeBtn.disabled = true;
@@ -117,12 +117,34 @@ document.addEventListener('DOMContentLoaded', () => {
         await checkPortfolioStatus(currentHostname);
         await loadPortfolioList();
 
-        // Check cached analysis in chrome.storage.local
-        chrome.storage.local.get([`analysis_${currentHostname}`, 'cachedAnalysis'], (res) => {
-            const cached = res[`analysis_${currentHostname}`] || 
-                (res.cachedAnalysis && res.cachedAnalysis.url === currentHostname ? res.cachedAnalysis : null);
+        // Check cached analysis in chrome.storage.local keyed by hostname
+        chrome.storage.local.get([`analysis_${currentHostname}`], (res) => {
+            const cached = res[`analysis_${currentHostname}`];
 
             if (cached && cached.data) {
+                const now = Date.now();
+                const isFresh = (now - (cached.timestamp || 0)) < (24 * 60 * 60 * 1000); // 24hr freshness
+                const currentTabUrl = currentActiveTab ? (currentActiveTab.url || "").toLowerCase() : "";
+                const isCurrentTabPolicy = currentTabUrl.includes("privacy") || currentTabUrl.includes("terms");
+                const wasCachedPolicyBlocked = (cached.data.status === "blocked" || cached.data.status === "not_a_policy");
+
+                // If cache is stale (> 24 hours), or if user is on policy page but cached state was blocked from login page,
+                // do not substitute stale negative/blocked result.
+                if (!isFresh) {
+                    showStatus("Cached analysis is older than 24 hours. Click 'Scan Website' to refresh.", "info");
+                    return;
+                }
+                if (isCurrentTabPolicy && wasCachedPolicyBlocked) {
+                    showStatus("Active page is a privacy policy. Click 'Scan Website' to inspect it directly.", "info");
+                    return;
+                }
+
+                if (cached.policy_url) {
+                    policyLink.href = cached.policy_url;
+                    policyLink.textContent = `Open Privacy Policy ↗`;
+                    policyLinkContainer.classList.remove('hidden');
+                }
+
                 if (cached.timestamp) {
                     const d = new Date(cached.timestamp);
                     lastScannedTimeEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
@@ -191,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentActiveTab) return;
         analyzeBtn.disabled = true;
         resultsDiv.classList.add('hidden');
+        scanBadge.textContent = "Scanning...";
+        scanBadge.className = "badge scanning";
         showStatus("Inspecting webpage for privacy policy...", "info");
 
         // Inject content script to inspect DOM
@@ -199,6 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
             files: ['content.js']
         }, () => {
             if (chrome.runtime.lastError) {
+                scanBadge.textContent = "Unsupported";
+                scanBadge.className = "badge neutral";
                 showStatus("Could not access page: " + chrome.runtime.lastError.message, "error");
                 pasteSection.classList.remove('hidden');
                 analyzeBtn.disabled = false;
@@ -207,6 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chrome.tabs.sendMessage(currentActiveTab.id, { action: "extract_text" }, async (pageData) => {
                 if (chrome.runtime.lastError || !pageData) {
+                    scanBadge.textContent = "Unsupported";
+                    scanBadge.className = "badge neutral";
                     showStatus("Unable to read page automatically. Paste policy text below to analyze.", "warning");
                     pasteSection.classList.remove('hidden');
                     analyzeBtn.disabled = false;
@@ -220,8 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     policyLinkContainer.classList.remove('hidden');
                 }
 
-                // Case 1: Currently on a Privacy Policy page
-                if (pageData.isLikelyPrivacyPolicy && pageData.text && pageData.text.length > 200) {
+                // Case 1: Currently on a genuine Privacy Policy page
+                const isShortPage = pageData.text && pageData.text.length < 1500;
+                const hasDiscoveredLink = Boolean(pageData.policyLink && pageData.policyLink.href);
+
+                // If page is clearly a full policy, or if no linked policy exists, analyze current page
+                if (pageData.isLikelyPrivacyPolicy && pageData.text && (!isShortPage || !hasDiscoveredLink)) {
                     showStatus("Analysing current privacy policy page...", "info");
                     await runAnalysis({
                         text: pageData.text,
@@ -260,6 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
 
                             if (policyText.length < 200) {
+                                scanBadge.textContent = "Unable to assess";
+                                scanBadge.className = "badge insufficient";
                                 showStatus("Discovered policy page had very little readable text. Please open it directly or paste text below.", "warning");
                                 pasteSection.classList.remove('hidden');
                                 analyzeBtn.disabled = false;
@@ -274,13 +308,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                 truncated: truncated
                             });
                         } else {
-                            // Proxy blocked by Cloudflare/anti-bot firewall
-                            showStatus("🛡️ Website anti-bot protection blocked the background scan. Click 'Open Privacy Policy Page ↗' to scan it directly, or paste text below.", "warning");
+                            // Proxy blocked by Cloudflare/anti-bot firewall or login barrier
+                            scanBadge.textContent = "Blocked";
+                            scanBadge.className = "badge blocked";
+                            showStatus("🛡️ Website anti-bot protection or login wall blocked the background crawl. Click 'Open Privacy Policy Page ↗' to scan directly, or paste text below.", "warning");
                             policyLinkContainer.classList.remove('hidden');
                             pasteSection.classList.remove('hidden');
                             analyzeBtn.disabled = false;
                         }
                     } catch (err) {
+                        scanBadge.textContent = "Error";
+                        scanBadge.className = "badge insufficient";
                         showStatus("Background fetch failed. Please open the privacy policy link directly or paste text below.", "warning");
                         pasteSection.classList.remove('hidden');
                         analyzeBtn.disabled = false;
@@ -289,6 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Case 3: Neither on policy nor link discovered
+                scanBadge.textContent = "No Policy Found";
+                scanBadge.className = "badge insufficient";
                 showStatus("No privacy policy link was automatically detected on this page. If this service has a policy, open it or paste the text below.", "warning");
                 pasteSection.classList.remove('hidden');
                 analyzeBtn.disabled = false;
@@ -338,19 +378,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || `HTTP ${res.status}`);
             }
 
-            // Save to chrome storage
+            // Save to chrome storage isolated by hostname with origin details
             const now = Date.now();
+            const lifecycleState = data.status === "ok" ? "success" : (data.status || "success");
             chrome.storage.local.set({
                 [`analysis_${currentHostname}`]: {
                     url: currentHostname,
-                    timestamp: now,
-                    data: data
-                },
-                cachedAnalysis: {
-                    url: currentHostname,
+                    page_url: currentActiveTab ? currentActiveTab.url : "",
+                    policy_url: data.policy_url || "",
+                    policy_url_source: data.policy_url_source || "direct_page",
                     timestamp: now,
                     data: data,
-                    newEntities: []
+                    lifecycle: lifecycleState
                 }
             });
 
@@ -382,10 +421,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Coverage badge on site card
         const coverage = data.coverage || {};
-        if (coverage.status === "complete") {
+        if (data.status === "blocked") {
+            scanBadge.textContent = "Blocked";
+            scanBadge.className = "badge blocked";
+        } else if (data.status === "insufficient_evidence" || coverage.status === "insufficient") {
+            scanBadge.textContent = "Unable to assess";
+            scanBadge.className = "badge insufficient";
+        } else if (coverage.status === "complete" || data.status === "ok") {
             scanBadge.textContent = "✓ Complete Scan";
             scanBadge.className = "badge complete";
-        } else if (coverage.status === "partial") {
+        } else if (coverage.status === "partial" || data.status === "partial") {
             scanBadge.textContent = "⚠️ Partial Scan";
             scanBadge.className = "badge partial";
         } else {
@@ -606,41 +651,51 @@ document.addEventListener('DOMContentLoaded', () => {
             q4Box.innerHTML = html;
         } else {
             q4Sub.textContent = 'First recorded scan for this website';
-            q4Box.innerHTML = '<div class="empty-msg">This is the first recorded scan for this service. Future scans will display any policy modifications and permission changes here.</div>';
+            q4Box.innerHTML = '<div class="empty-msg">This is the first recorded scan for this service. Future scans will display any policy modifications and disclosure changes here.</div>';
         }
 
         // ----------------------------------------------------
         // Secondary Score & Audit Summary
         // ----------------------------------------------------
-        const scoreVal = Number(data.risk_score ?? data.risk ?? 0);
-        document.getElementById('risk-score').textContent = scoreVal.toFixed(0);
+        const pres = data.presentation_verdict || {};
+        const isInsufficient = (data.status === "insufficient_evidence" || (data.coverage && data.coverage.status === "insufficient"));
+        const scoreVal = isInsufficient ? null : Number(data.risk_score ?? data.risk ?? 0);
+        document.getElementById('risk-score').textContent = (scoreVal !== null) ? scoreVal.toFixed(0) : "--";
 
-        const category = data.risk_category || 'Inconclusive';
+        const category = pres.label || data.risk_category || 'Inconclusive';
         const bandEl = document.getElementById('risk-band');
         if (bandEl) {
             bandEl.textContent = category;
-            bandEl.className = `band ${category.replace(/\s+/g, '')}`;
+            let bandClass = "Moderate";
+            if (category === "Lower Risk" || category === "Low") bandClass = "Low";
+            else if (category === "Moderate Risk" || category === "Moderate") bandClass = "Moderate";
+            else if (category === "Elevated Risk" || category === "High" || category === "Very High") bandClass = "High";
+            else bandClass = "Inconclusive";
+            bandEl.className = `band ${bandClass}`;
         }
 
         const gaugeFill = document.getElementById('gauge-fill');
         if (gaugeFill) {
-            const pct = Math.min(100, Math.max(0, Math.round(scoreVal)));
+            const pct = (scoreVal !== null) ? Math.min(100, Math.max(0, Math.round(scoreVal))) : 0;
             gaugeFill.style.width = `${pct}%`;
+            if (pct >= 60) gaugeFill.style.backgroundColor = "var(--alert)";
+            else if (pct >= 30) gaugeFill.style.backgroundColor = "var(--warning)";
+            else gaugeFill.style.backgroundColor = "var(--safe)";
         }
 
         // Coverage Box
         const coverageEl = document.getElementById('coverage-note');
         if (coverageEl) {
             let covHtml = '';
-            if (coverage.status === 'partial') {
+            if (coverage.status === 'partial' || data.status === 'partial') {
                 covHtml = `
                     <div class="cov-status" style="color:var(--warning);">⚠️ Partial Analysis</div>
-                    <div>Policy text exceeded 50,000 characters. Only the first 50k characters were analysed (${coverage.clauses_found ?? 0} clauses identified).</div>
+                    <div>Analysed ${coverage.analysed_chars ?? '?'} characters across segmented chunks (${coverage.clauses_found ?? 0} clauses identified).</div>
                 `;
-            } else if (coverage.status === 'insufficient') {
+            } else if (coverage.status === 'insufficient' || data.status === 'insufficient_evidence') {
                 covHtml = `
                     <div class="cov-status" style="color:var(--alert);">⚠️ Insufficient Evidence</div>
-                    <div>Less than 300 characters or no privacy clauses were found. The score is deemed Inconclusive.</div>
+                    <div>Less than 300 characters or no privacy clauses were found. The score is deemed Unable to assess.</div>
                 `;
             } else {
                 covHtml = `
@@ -761,17 +816,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     : `No new data types beyond what ${escapeHtml(target)} collects.`;
 
                 compareResultsDiv.innerHTML = `
-                    <div style="margin-bottom: 5px;"><b>⚖️ Overlapping permissions with ${escapeHtml(target)}:</b> ${overlap.length} types</div>
+                    <div style="margin-bottom: 5px;"><b>⚖️ Overlapping data practices with ${escapeHtml(target)}:</b> ${overlap.length} categories</div>
                     <div style="color: var(--ink-3); font-size: 11px; margin-bottom: 8px;">${overlapText}</div>
                     
-                    <div style="margin-bottom: 5px;"><b>🚨 Newly introduced data types:</b> ${newTypes.length} types</div>
+                    <div style="margin-bottom: 5px;"><b>🚨 Newly introduced data categories:</b> ${newTypes.length} categories</div>
                     <div style="color: ${newTypes.length > 0 ? 'var(--alert)' : 'var(--safe)'}; font-size: 11px; margin-bottom: 8px;">${newText}</div>
                     
                     <div style="font-weight: 700; color: ${newTypes.length > 0 ? 'var(--alert)' : 'var(--safe)'}; border-top: 1px solid var(--line); padding-top: 6px;">
                         ${verdictText}
                     </div>
                     <div class="hint" style="margin-top: 4px; font-style: italic;">
-                        Comparison reflects stated policy permissions and does not imply data transfer between services.
+                        Comparison reflects stated website policy disclosures and does not imply browser extension permissions or data transfer between services.
                     </div>
                 `;
                 compareResultsDiv.classList.remove('hidden');

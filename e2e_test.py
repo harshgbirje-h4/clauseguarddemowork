@@ -28,14 +28,15 @@ try:
     portfolio = r.json()
     names = [s['service_name'] for s in portfolio['services']]
     print("Portfolio Services:", names)
-    assert 'MyNewApp Privacy Policy' in names, "Service not found in portfolio"
+    expected_name = analysis_result["service_name"]
+    assert expected_name in names, f"Service '{expected_name}' not found in portfolio"
     
     # 4. Check graph
     r = requests.get('http://127.0.0.1:5000/api/overlap-graph')
     graph = r.json()
     nodes = [n['id'] for n in graph['nodes']]
-    assert 'MyNewApp Privacy Policy' in nodes, "Service not found in graph nodes"
-    print("Graph contains service:", 'MyNewApp Privacy Policy' in nodes)
+    assert expected_name in nodes, f"Service '{expected_name}' not found in graph nodes"
+    print("Graph contains service:", expected_name in nodes)
     
     print("End-to-end HTTP API check passed!")
 

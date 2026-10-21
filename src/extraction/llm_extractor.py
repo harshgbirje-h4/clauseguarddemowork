@@ -59,12 +59,8 @@ class LLMExtractor:
         
         extracted_clauses = []
         for i, text in enumerate(candidate_clauses):
-            # Deterministic dummy scoring
-            severity = 3.0 + (i % 3)
-            specificity = 2.0 + (i % 2)
-            
-            entities = []
             lower_text = text.lower()
+            entities = []
             
             for entity_name, pattern in patterns.items():
                 if re.search(pattern, lower_text):
@@ -72,13 +68,80 @@ class LLMExtractor:
                     
             if not entities: 
                 entities.append("General Data")
+
+            # Grounded semantic risk scoring based on disclosed practices in source text
+            # 1. Protective commitments
+            if any(w in lower_text for w in ["do not sell", "opt-out", "opt out", "delete your", "right to access", "encryption"]):
+                severity = 1.0
+                specificity = 1.0
+                category = "Protective Commitment"
+            # 2. Critical practices: Commercial data sale & Biometrics
+            elif any(w in lower_text for w in ["sell", "sale of data", "monetiz", "commercial sale"]):
+                severity = 5.0
+                specificity = 4.0
+                category = "Data Selling"
+            elif "Biometric Data" in entities or any(w in lower_text for w in ["biometric", "facial recognition", "fingerprint", "voiceprint"]):
+                severity = 5.0
+                specificity = 4.5
+                category = "Biometric Data"
+            # 3. High severity: Precise real-time tracking
+            elif "Precise Location" in entities or any(w in lower_text for w in ["precise location", "exact location", "gps coordinates", "real-time location"]):
+                severity = 4.5
+                specificity = 4.0
+                category = "Precise Location"
+            # 4. Elevated risks: Targeted advertising & broker tracking
+            elif "Advertising Data" in entities or any(w in lower_text for w in ["advertis", "targeted ad", "ad network", "marketing partner"]):
+                severity = 4.0
+                specificity = 3.5
+                category = "Targeted Advertising"
+            # 5. Third-party disclosures & communications recording
+            elif any(w in lower_text for w in ["third part", "share with", "disclose to", "affiliate"]):
+                severity = 3.5
+                specificity = 3.0
+                category = "Third-Party Sharing"
+            elif "Communications" in entities:
+                severity = 3.5
+                specificity = 3.5
+                category = "Communications"
+            # 6. Moderate data collection
+            elif "Location" in entities:
+                severity = 3.0
+                specificity = 2.5
+                category = "Location Tracking"
+            elif any(e in entities for e in ["Device Information", "IP Address", "Identifiers"]):
+                severity = 2.5
+                specificity = 3.0
+                category = "Device & Network Logging"
+            elif any(e in entities for e in ["Analytics Data", "Cookies", "Usage Data"]):
+                severity = 2.5
+                specificity = 2.5
+                category = "Usage Analytics"
+            elif "Payment Information" in entities:
+                severity = 2.5
+                specificity = 3.0
+                category = "Payment Information"
+            elif any(e in entities for e in ["Contact Information", "Email Address", "Phone Number", "Name"]):
+                severity = 2.0
+                specificity = 2.5
+                category = "Contact Information"
+            elif "Account Information" in entities:
+                severity = 1.5
+                specificity = 2.0
+                category = "Account Authentication"
+            else:
+                severity = 2.0
+                specificity = 2.0
+                category = "General Disclosures"
+
+            if len(entities) >= 3:
+                specificity = min(5.0, specificity + 0.5)
             
             extracted_clauses.append({
                 "text": text,
                 "entities": entities,
                 "severity_score": float(severity),
                 "specificity_score": float(specificity),
-                "risk_category": "Mock Category"
+                "risk_category": category
             })
             
         return {

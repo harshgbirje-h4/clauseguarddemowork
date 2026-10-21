@@ -176,6 +176,16 @@ main {
   color: var(--alert);
   border: 1px solid var(--alert-border);
 }
+.badge.blocked {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.badge.scanning {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
 .badge.neutral {
   background: var(--neutral-bg);
   color: var(--neutral-text);

@@ -1,7 +1,7 @@
 // ClauseGuard Content Script
 // Extracts text, detects privacy policies & links, and powers the Active Login Shield
 
-const MAX_POLICY_CHARS = 50000;
+const MAX_POLICY_CHARS = 250000;
 
 // Extract readable text from the current page
 function extractPageText() {
@@ -19,26 +19,35 @@ function extractPageText() {
         text = text.substring(0, MAX_POLICY_CHARS);
     }
     
-    // Heuristic detection: is the current page likely a privacy policy?
-    const titleLower = (document.title || "").toLowerCase();
-    const urlLower = (window.location.href || "").toLowerCase();
-    const privacyKeywords = ['privacy policy', 'privacy notice', 'privacy statement', 'data protection', 'data policy', 'privacy'];
+    // Check if on a login page or authentication page
+    const isAuthPath = Boolean(urlLower.match(/\/(login|signin|auth|oauth|account\/login|wp-login)/));
+    const hasPasswordField = Boolean(document.querySelector('input[type="password"]'));
+    const isAuthPage = isAuthPath || hasPasswordField;
+
+    // Specific multi-word phrases for policy identification
+    const specificPrivacyPhrases = ['privacy policy', 'privacy notice', 'privacy statement', 'data protection policy', 'data policy'];
     
     let isLikelyPrivacyPolicy = false;
-    if (privacyKeywords.some(kw => titleLower.includes(kw) || urlLower.includes(kw.replace(/\s+/g, '-')) || urlLower.includes(kw.replace(/\s+/g, '')))) {
-        isLikelyPrivacyPolicy = true;
-    }
-    
-    if (!isLikelyPrivacyPolicy) {
-        const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => (h.innerText || '').toLowerCase());
-        if (headings.some(h => privacyKeywords.some(kw => h.includes(kw)))) {
+    // An authentication/login form is never the privacy policy document itself
+    if (!isAuthPage) {
+        if (specificPrivacyPhrases.some(kw => titleLower.includes(kw) || urlLower.includes(kw.replace(/\s+/g, '-')) || urlLower.includes(kw.replace(/\s+/g, '')))) {
             isLikelyPrivacyPolicy = true;
         }
-    }
-    
-    const textPrefix = text.substring(0, 2000).toLowerCase();
-    if (!isLikelyPrivacyPolicy && privacyKeywords.some(kw => textPrefix.includes(kw))) {
-        isLikelyPrivacyPolicy = true;
+        
+        if (!isLikelyPrivacyPolicy) {
+            const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => (h.innerText || '').toLowerCase());
+            if (headings.some(h => specificPrivacyPhrases.some(kw => h.includes(kw)))) {
+                isLikelyPrivacyPolicy = true;
+            }
+        }
+        
+        // Only inspect text prefix if page has substantial policy text (> 1500 chars) and contains explicit policy phrase
+        if (!isLikelyPrivacyPolicy && text.length > 1500) {
+            const textPrefix = text.substring(0, 2000).toLowerCase();
+            if (specificPrivacyPhrases.some(kw => textPrefix.includes(kw))) {
+                isLikelyPrivacyPolicy = true;
+            }
+        }
     }
 
     let title = document.title;
@@ -63,42 +72,68 @@ function extractPageText() {
 function findPrivacyPolicyLink() {
     const links = Array.from(document.querySelectorAll('a'));
     
-    // Pass 1: exact or high-confidence anchor text
-    for (const a of links) {
-        const text = (a.innerText || "").toLowerCase().trim();
-        const href = (a.href || "").trim();
-        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
-        if (text === "privacy policy" || text === "privacy notice" || text === "privacy statement") {
-            return { href: a.href, text: a.innerText.trim() };
+    function isAuthOrInvalid(href) {
+        if (!href) return true;
+        const h = href.toLowerCase();
+        if (h.startsWith('javascript:') || h === '#' || h.startsWith('mailto:') || h.startsWith('tel:')) return true;
+        // Never select an auth / signin / login / password link as a privacy policy
+        if (h.match(/\/(login|signin|sign-in|signup|sign-up|oauth|passwordreset|join)\b/i) || h.includes('trk=guest_homepage') || h.includes('fromsignin=true')) {
+            return true;
         }
+        return false;
     }
-    
-    // Pass 2: anchor text contains privacy
-    for (const a of links) {
-        const text = (a.innerText || "").toLowerCase().trim();
-        const href = (a.href || "").trim();
-        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
-        if (text.includes("privacy policy") || text.includes("privacy notice") || text.includes("data protection policy")) {
-            return { href: a.href, text: a.innerText.trim() };
-        }
-    }
-    
-    // Pass 3: general 'privacy' link
-    for (const a of links) {
-        const text = (a.innerText || "").toLowerCase().trim();
-        const href = (a.href || "").trim();
-        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('mailto:')) continue;
-        if (text === "privacy" || text.includes("privacy")) {
-            return { href: a.href, text: a.innerText.trim() };
+
+    function makeAbsolute(href) {
+        try {
+            return new URL(href, window.location.href).href;
+        } catch(e) {
+            return href;
         }
     }
 
-    // Pass 4: URL structure
+    // Pass 1: exact or high-confidence anchor text
     for (const a of links) {
-        const href = (a.href || "").toLowerCase();
-        if (!href || href.startsWith('javascript:') || href === '#') continue;
-        if (href.includes("/privacy-policy") || href.includes("/privacy") || href.includes("privacy.html") || href.includes("privacypolicy")) {
-            return { href: a.href, text: (a.innerText || "").trim() || "Privacy Policy" };
+        const rawHref = a.getAttribute('href') || a.href || "";
+        const absHref = makeAbsolute(rawHref);
+        const text = (a.innerText || a.textContent || "").toLowerCase().trim();
+        if (isAuthOrInvalid(absHref)) continue;
+        if (text === "privacy policy" || text === "privacy notice" || text === "privacy statement" || text === "data protection policy") {
+            return { href: absHref, text: (a.innerText || a.textContent || "").trim() };
+        }
+    }
+    
+    // Pass 2: URL structure contains explicit privacy policy path
+    for (const a of links) {
+        const rawHref = a.getAttribute('href') || a.href || "";
+        const absHref = makeAbsolute(rawHref);
+        const text = (a.innerText || a.textContent || "").toLowerCase().trim();
+        if (isAuthOrInvalid(absHref)) continue;
+        const hLower = absHref.toLowerCase();
+        if (hLower.includes("/legal/privacy-policy") || hLower.includes("/privacy-policy") || hLower.includes("/privacy-notice") || hLower.includes("/data-policy") || hLower.includes("/privacy/policy")) {
+            return { href: absHref, text: (a.innerText || a.textContent || "").trim() || "Privacy Policy" };
+        }
+    }
+
+    // Pass 3: anchor text contains privacy policy / notice / statement
+    for (const a of links) {
+        const rawHref = a.getAttribute('href') || a.href || "";
+        const absHref = makeAbsolute(rawHref);
+        const text = (a.innerText || a.textContent || "").toLowerCase().trim();
+        if (isAuthOrInvalid(absHref)) continue;
+        if (text.includes("privacy policy") || text.includes("privacy notice") || text.includes("privacy statement") || text.includes("data protection policy")) {
+            return { href: absHref, text: (a.innerText || a.textContent || "").trim() };
+        }
+    }
+
+    // Pass 4: general privacy link with valid privacy URL
+    for (const a of links) {
+        const rawHref = a.getAttribute('href') || a.href || "";
+        const absHref = makeAbsolute(rawHref);
+        const text = (a.innerText || a.textContent || "").toLowerCase().trim();
+        if (isAuthOrInvalid(absHref)) continue;
+        const hLower = absHref.toLowerCase();
+        if ((text === "privacy" || text.includes("privacy")) && (hLower.includes("privacy") || hLower.includes("legal") || hLower.includes("policy"))) {
+            return { href: absHref, text: (a.innerText || a.textContent || "").trim() || "Privacy Policy" };
         }
     }
 
@@ -160,14 +195,16 @@ async function initActiveLoginShield() {
     
     if (!passwordField && !isAuthPath) return;
 
-    // Check cache in chrome.storage.local
+    // Check cache in chrome.storage.local keyed by hostname
+    const cacheKey = `analysis_${host}`;
     try {
-        const cacheResult = await new Promise(resolve => chrome.storage.local.get(['cachedAnalysis'], resolve));
-        if (cacheResult.cachedAnalysis && cacheResult.cachedAnalysis.url === window.location.hostname) {
-            const timeElapsed = Date.now() - cacheResult.cachedAnalysis.timestamp;
+        const cacheResult = await new Promise(resolve => chrome.storage.local.get([cacheKey], resolve));
+        const cached = cacheResult[cacheKey];
+        if (cached && cached.url === host) {
+            const timeElapsed = Date.now() - cached.timestamp;
             if (timeElapsed < 24 * 60 * 60 * 1000) {
                 injectShieldUI();
-                showVerdict(cacheResult.cachedAnalysis.data, cacheResult.cachedAnalysis.newEntities || []);
+                showVerdict(cached.data, cached.newEntities || []);
                 return;
             }
         }
@@ -188,7 +225,7 @@ async function initActiveLoginShield() {
         // Fetch background policy via background service worker to prevent CSP/Mixed Content
         const proxyRes = await sendBgMessage("bg_proxy_fetch", { url: privacyLink.href });
         if (!proxyRes.ok || !proxyRes.data || !proxyRes.data.html) {
-            updateShieldUI("🛡️ Background scan blocked by site protection. Open policy page to scan directly.", "orange");
+            updateShieldUI("🛡️ Background scan blocked by site protection or login barrier. Open policy page to scan directly.", "orange");
             return;
         }
 
@@ -206,7 +243,7 @@ async function initActiveLoginShield() {
         const analyzeRes = await sendBgMessage("bg_analyze_policy", {
             payload: {
                 text: policyText,
-                url: window.location.href,
+                url: privacyLink.href,
                 title: document.title,
                 truncated: policyTruncated
             }
@@ -223,13 +260,16 @@ async function initActiveLoginShield() {
             newEntities = marginalRes.data.newly_introduced_entities || [];
         }
 
-        // Cache result for popup and reloads
+        // Cache result isolated by hostname for popup and reloads
         chrome.storage.local.set({
-            cachedAnalysis: {
-                url: window.location.hostname,
+            [cacheKey]: {
+                url: host,
+                page_url: window.location.href,
+                policy_url: privacyLink.href,
                 timestamp: Date.now(),
                 data: analysisData,
-                newEntities: newEntities
+                newEntities: newEntities,
+                lifecycle: "success"
             }
         });
 
@@ -240,30 +280,35 @@ async function initActiveLoginShield() {
 }
 
 function showVerdict(analysisData, newEntities) {
+    const pres = analysisData.presentation_verdict || {};
     const score = Number(analysisData.risk_score ?? analysisData.risk ?? 0);
-    const category = analysisData.risk_category || "Inconclusive";
+    const category = pres.label || analysisData.risk_category || "Inconclusive";
     const coverage = analysisData.coverage || {};
 
     let style = "orange";
     let icon = "⚠️";
-    if (category === "Low") { style = "green"; icon = "✓"; }
-    else if (category === "Moderate") { style = "orange"; icon = "⚠️"; }
-    else if (category === "High" || category === "Very High") { style = "red"; icon = "🚨"; }
+    if (category === "Lower Risk" || category === "Low") { style = "green"; icon = "✓"; }
+    else if (category === "Moderate Risk" || category === "Moderate") { style = "orange"; icon = "⚠️"; }
+    else if (category === "Elevated Risk" || category === "High" || category === "Very High") { style = "red"; icon = "🚨"; }
     else { style = "orange"; icon = "❔"; }
 
     if (newEntities.length > 0 && style === "green") style = "orange";
 
     let note = "";
     if (coverage.status === "partial") note += " (Partial policy analysed)";
-    if (coverage.status === "insufficient") note += " (Insufficient text)";
+    if (coverage.status === "insufficient") note += " (Insufficient evidence)";
 
     let newText = "";
     if (newEntities.length > 0) {
-        newText = ` | New types: ${newEntities.slice(0, 3).join(', ')}`;
+        newText = ` | New data types: ${newEntities.slice(0, 3).join(', ')}`;
     }
 
+    const scoreText = (category === "Unable to assess" || coverage.status === "insufficient")
+        ? "Unable to assess"
+        : `${score.toFixed(0)}/100`;
+
     updateShieldUI(
-        `${icon} Privacy Risk: ${category} (${score.toFixed(0)}/100)${note}${newText}`,
+        `${icon} Privacy Risk: ${category} (${scoreText})${note}${newText}`,
         style
     );
 }

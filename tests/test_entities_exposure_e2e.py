@@ -164,7 +164,7 @@ class TestFailurePaths(unittest.TestCase):
 
     def test_extraction_failure_returns_error_not_crash(self):
         with patch.object(dashboard, 'extract_pipeline', side_effect=RuntimeError("model unavailable")):
-            resp = self.client.post('/api/analyze-policy', json={"text": "x" * 400})
+            resp = self.client.post('/api/analyze-policy', json={"text": "We collect personal information and share it with third parties. " * 10})
         self.assertEqual(resp.status_code, 500)
         self.assertIn("model unavailable", json.loads(resp.data)["error"])
 

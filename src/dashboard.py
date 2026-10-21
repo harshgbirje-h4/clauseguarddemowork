@@ -14,7 +14,17 @@ from src.scoring import ScoringEngine
 from src.marginal import MarginalRiskEngine
 from src.extract import extract_pipeline
 from src.canonicalize import EntityCanonicalizer
-from src.risk import policy_risk_score, risk_category, coverage_report
+from src.risk import (
+    policy_risk_score,
+    risk_category,
+    coverage_report,
+    is_plausible_privacy_policy,
+    calibrate_score,
+    get_risk_band,
+    get_presentation_verdict,
+    is_negated_claim,
+    inspect_policy_statement,
+)
 
 app = Flask(__name__, static_folder='static')
 
@@ -101,6 +111,41 @@ def analyze_policy():
     if not service_name:
         service_name = "Unknown Web Service"
 
+    # Task 2: Validate that the text is plausibly a privacy policy before extraction
+    if not is_plausible_privacy_policy(text, url, title):
+        cov = coverage_report(
+            analysed_chars=len(text),
+            truncated=truncated,
+            clauses_found=0,
+            is_demo=False
+        )
+        response_data = {
+            "service": service_name,
+            "service_name": service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": None,
+            "band": None,
+            "status": "not_a_policy",
+            "message": "This page doesn't look like a privacy policy. Open the policy page directly or paste the text.",
+            "clauses": [],
+            "risk": 0.0,
+            "risk_score": 0.0,
+            "risk_category": "Inconclusive",
+            "raw_risk": 0.0,
+            "canonical_entities": [],
+            "collection_findings": [],
+            "unmapped_entities": [],
+            "unmapped_suggestions": {},
+            "entity_sources": {},
+            "coverage": cov,
+            "is_saved_in_portfolio": False,
+            "previous_scan": None,
+            "sharing_findings": [],
+            "control_findings": []
+        }
+        return jsonify(response_data), 200
+
     try:
         # C1 Extraction
         extracted = extract_pipeline(text, service_name)
@@ -131,17 +176,39 @@ def analyze_policy():
         mode = extracted.get("mode", "UNKNOWN")
         is_demo = mode.startswith("MOCK")
 
-        # C4 Scoring: bounded 0-100 score, plus category and coverage.
-        # The old unbounded sum is kept as raw_risk for backward compatibility.
+        # C4 Scoring: bounded 0-100 score, plus category, presentation verdict, and coverage.
+        total_chars = extracted.get("total_chars", len(text))
+        processed_chars = extracted.get("processed_chars", len(text))
+        is_truncated_doc = truncated or extracted.get("is_truncated", False)
+
         score = policy_risk_score(clauses)
         coverage = coverage_report(
             analysed_chars=len(text),
-            truncated=truncated,
+            truncated=is_truncated_doc,
             clauses_found=len(clauses),
             is_demo=is_demo,
+            total_chars=total_chars,
+            processed_chars=processed_chars,
         )
         category = risk_category(score, coverage)
         raw_risk = ScoringEngine().calculate_service_score_from_clauses(clauses)
+
+        # Handle thin evidence / non-analysable content
+        is_insufficient = (coverage.get("status") == "insufficient")
+        if is_insufficient:
+            calibrated_score = None
+            band = None
+            status_verdict = "insufficient_evidence"
+            status_message = "The policy text provided was too short or lacked identifiable privacy disclosures to calculate a defensible score."
+            presentation_verdict = get_presentation_verdict(None, coverage)
+            display_score = 0.0
+        else:
+            calibrated_score = calibrate_score(score)
+            band = get_risk_band(calibrated_score)
+            status_verdict = "partial" if is_truncated_doc else "ok"
+            status_message = None
+            presentation_verdict = get_presentation_verdict(calibrated_score, coverage)
+            display_score = float(calibrated_score)
 
         # Check if service is already saved in portfolio
         is_saved = False
@@ -199,8 +266,23 @@ def analyze_policy():
             c_spec = float(c.get("specificity_score") or 0)
             c_risk = round(100.0 * (c_sev / 5.0) * (c_spec / 5.0), 1)
 
-            if any(kw in c_text_lower for kw in sharing_keywords):
-                if any(w in c_text_lower for w in ["sell", "sale", "commercial value", "monetiz"]):
+            stmt_info = inspect_policy_statement(c_text)
+            is_neg = stmt_info["is_protective_commitment"]
+            has_contrast = stmt_info["has_contrastive_affirmation"]
+            has_exception = stmt_info["has_exception"]
+
+            if any(kw in c_text_lower for kw in sharing_keywords) or stmt_info["confirmed_practices"]:
+                if is_neg:
+                    kind = "Commitment: No Data Selling / Restricted Sharing"
+                    summary = stmt_info["grounded_reason"]
+                    c_risk = 0.0
+                elif has_contrast:
+                    kind = "Third-Party Sharing (Contrastive Affirmation)"
+                    summary = stmt_info["grounded_reason"]
+                elif has_exception:
+                    kind = "Qualified Data Disclosures (Exceptions Apply)"
+                    summary = stmt_info["grounded_reason"]
+                elif any(w in c_text_lower for w in ["sell", "sale", "commercial value", "monetiz"]):
                     kind = "Selling / Commercial Transfer"
                     summary = "States or reserves the right to sell or commercially transfer personal data."
                 elif any(w in c_text_lower for w in ["advertis", "marketing partner", "ad network", "targeted ad"]):
@@ -221,11 +303,17 @@ def analyze_policy():
                     "summary": summary,
                     "clause_text": c_text,
                     "risk": c_risk,
+                    "is_negated": is_neg,
+                    "has_contrast": has_contrast,
+                    "has_exception": has_exception,
                     "entities": c.get("canonical_entities") or c.get("entities") or []
                 })
 
-            if any(kw in c_text_lower for kw in control_keywords):
-                if any(w in c_text_lower for w in ["delete", "deletion", "erasure", "erase", "remove account"]):
+            if any(kw in c_text_lower for kw in control_keywords) or is_neg:
+                if is_neg:
+                    kind = "Commercial Sale Prohibition"
+                    summary = "Affirms that personal data is never sold or traded to third parties."
+                elif any(w in c_text_lower for w in ["delete", "deletion", "erasure", "erase", "remove account"]):
                     kind = "Account / Data Deletion"
                     summary = "Provides procedures to request deletion of personal information or account data."
                 elif any(w in c_text_lower for w in ["opt-out", "opt out", "unsubscribe", "promotional email"]):
@@ -291,26 +379,60 @@ def analyze_policy():
                 "evidence": quote
             })
 
+        # Contract clauses with mandatory fields: type, meaning, what_you_can_do, excerpt, offsets & provenance
+        contract_clauses = []
+        for c in clauses:
+            contract_clauses.append({
+                "type": c.get("type", "other"),
+                "meaning": c.get("meaning", "General privacy clause regarding service operation."),
+                "what_you_can_do": c.get("what_you_can_do", "Review your account privacy choices."),
+                "excerpt": c.get("excerpt", c.get("text", "")),
+                # preserve backward compatibility fields
+                "text": c.get("text", c.get("excerpt", "")),
+                "entities": c.get("entities", []),
+                "canonical_entities": c.get("canonical_entities", []),
+                "severity_score": c.get("severity_score"),
+                "specificity_score": c.get("specificity_score"),
+                "risk_category": c.get("risk_category"),
+                "char_start": c.get("char_start", 0),
+                "char_end": c.get("char_end", len(c.get("excerpt", ""))),
+                "detection_method": c.get("detection_method", "deterministic_rule"),
+                "confidence": c.get("confidence", 1.0),
+                "grounded_reason": c.get("grounded_reason", "Verified in policy text"),
+                "is_negated": c.get("is_negated", False),
+                "has_exception": c.get("has_exception", False),
+                "has_contrastive_affirmation": c.get("has_contrastive_affirmation", False),
+                "is_verified": c.get("is_verified", True)
+            })
+
         # Assemble Response
         response_data = {
-            "service_name": extracted.get("service_name"),
+            "service": extracted.get("service_name") or service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": calibrated_score,
+            "band": band,
+            "status": status_verdict,
+            "message": status_message,
+            "clauses": contract_clauses,
+            "presentation_verdict": presentation_verdict,
+            # Backward compatibility fields:
+            "service_name": extracted.get("service_name") or service_name,
             "mode": mode,
-            "clauses": clauses,
             "canonical_entities": sorted(list(all_canonical_entities)),
             "collection_findings": collection_findings,
             "unmapped_entities": sorted(unmapped),
             "unmapped_suggestions": unmapped,   # raw phrase -> suggested category, for review only
             "entity_sources": entity_sources,   # canonical entity -> clause text it came from
-            "risk": score,              # 0-100, same key the extension already reads
-            "risk_score": score,
-            "risk_category": category,  # Low / Moderate / High / Very High / Inconclusive
-            "raw_risk": raw_risk,       # legacy unbounded sum, not for display
+            "risk": display_score,              # 0-100, same key the extension already reads
+            "risk_score": display_score,
+            "risk_category": category,          # Low / Moderate / High / Very High / Inconclusive
+            "raw_risk": raw_risk,               # legacy unbounded sum, not for display
             "coverage": coverage,
             "is_saved_in_portfolio": is_saved,
             "previous_scan": previous_scan,
             "sharing_findings": sharing_findings[:5],
-            "control_findings": control_findings[:5],
-            "policy_url": url
+            "control_findings": control_findings[:5]
         }
         return jsonify(response_data)
         
@@ -539,6 +661,251 @@ def get_service_status():
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/api/compare', methods=['GET', 'POST', 'OPTIONS'])
+def compare_scan_endpoint():
+    """
+    Task 5: Scans a service by name or URL and returns the standard output contract.
+    Works for any service, including those not yet in the portfolio database.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    params = {}
+    if request.method == 'POST':
+        params = request.get_json(silent=True) or {}
+    else:
+        params = request.args.to_dict()
+
+    target = params.get("service") or params.get("name") or params.get("url") or params.get("query")
+    if not target:
+        return jsonify({
+            "service": "Unknown",
+            "policy_url": "",
+            "policy_url_source": "page_search",
+            "score": None,
+            "band": None,
+            "status": "error",
+            "message": "Missing 'service' or 'url' parameter to scan.",
+            "clauses": []
+        }), 400
+
+    text = params.get("text", "").strip()
+    url = params.get("url", "")
+    service_name = params.get("service") or params.get("name") or ""
+
+    # If target is a URL and url parameter wasn't given
+    if not url and (target.startswith("http://") or target.startswith("https://")):
+        url = target
+
+    # Derive service name if not provided
+    if not service_name and url:
+        import urllib.parse
+        parsed = urllib.parse.urlparse(url)
+        if parsed.netloc:
+            parts = parsed.netloc.split('.')
+            if parts[0] == 'www':
+                parts = parts[1:]
+            if len(parts) >= 2:
+                if parts[-2] in ['co', 'com', 'org', 'net', 'edu', 'gov'] and len(parts) >= 3:
+                    domain = parts[-3]
+                else:
+                    domain = parts[-2]
+                service_name = domain.capitalize()
+            elif len(parts) == 1:
+                service_name = parts[0].capitalize()
+
+    if not service_name and target and not (target.startswith("http://") or target.startswith("https://")):
+        service_name = target.strip().capitalize()
+
+    if not service_name:
+        service_name = "Unknown Service"
+
+    # If text is not provided, attempt to locate or fetch policy text
+    if not text:
+        # 1. Try local raw policy file
+        clean_name = service_name.lower().replace(" ", "_")
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        raw_candidate = os.path.join(base_dir, 'data', 'raw', f"{clean_name}.txt")
+        if os.path.exists(raw_candidate):
+            try:
+                with open(raw_candidate, 'r', encoding='utf-8') as f:
+                    text = f.read().strip()
+            except Exception as e:
+                logging.warning(f"Failed to read raw file {raw_candidate}: {e}")
+
+        # 2. Try fetching URL if provided
+        if not text and url:
+            try:
+                import urllib.request
+                import urllib.error
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    raw_html = response.read().decode('utf-8', errors='replace')
+                    if "Just a moment..." in raw_html or "cloudflare" in raw_html.lower():
+                        return jsonify({
+                            "service": service_name,
+                            "policy_url": url,
+                            "policy_url_source": "page_search",
+                            "score": None,
+                            "band": None,
+                            "status": "blocked",
+                            "message": "Automated fetch blocked by website protection. Open the policy page directly or paste the text.",
+                            "clauses": []
+                        }), 200
+                    # Very simple text extraction from HTML
+                    import re
+                    text = re.sub(r'<[^>]+>', ' ', raw_html)
+                    text = re.sub(r'\s+', ' ', text).strip()
+            except urllib.error.HTTPError as he:
+                status_code = "blocked" if he.code in [401, 403] else "error"
+                return jsonify({
+                    "service": service_name,
+                    "policy_url": url,
+                    "policy_url_source": "page_search",
+                    "score": None,
+                    "band": None,
+                    "status": status_code,
+                    "message": f"HTTP {he.code}: {he.reason}",
+                    "clauses": []
+                }), 200
+            except Exception as e:
+                return jsonify({
+                    "service": service_name,
+                    "policy_url": url,
+                    "policy_url_source": "page_search",
+                    "score": None,
+                    "band": None,
+                    "status": "error",
+                    "message": str(e),
+                    "clauses": []
+                }), 200
+
+        # 3. If service is in SQLite database, construct synthetic response from saved clauses
+        if not text and os.path.exists(DB_PATH):
+            try:
+                import sqlite3
+                conn = sqlite3.connect(DB_PATH)
+                cur = conn.cursor()
+                cur.execute("SELECT id, name FROM services WHERE name = ? COLLATE NOCASE", (service_name,))
+                s_row = cur.fetchone()
+                if s_row:
+                    s_id, s_name = s_row
+                    cur.execute("SELECT text, severity_score, specificity_score, risk_category FROM clauses WHERE service_id = ?", (s_id,))
+                    c_rows = cur.fetchall()
+                    conn.close()
+                    
+                    saved_clauses = [
+                        {
+                            "text": r[0] or "",
+                            "severity_score": r[1],
+                            "specificity_score": r[2],
+                            "risk_category": r[3]
+                        }
+                        for r in c_rows
+                    ]
+                    score = policy_risk_score(saved_clauses)
+                    cal_score = calibrate_score(score)
+                    band = get_risk_band(cal_score)
+                    
+                    from src.risk import classify_clause_type, get_clause_guidance
+                    contract_clauses = []
+                    for sc in saved_clauses:
+                        ctype = classify_clause_type(sc["text"], risk_category=sc.get("risk_category"))
+                        guidance = get_clause_guidance(ctype)
+                        contract_clauses.append({
+                            "type": ctype,
+                            "meaning": guidance.get("meaning", "General privacy clause."),
+                            "what_you_can_do": guidance.get("what_you_can_do", "Review your account privacy choices."),
+                            "excerpt": sc["text"]
+                        })
+                    
+                    return jsonify({
+                        "service": s_name,
+                        "policy_url": url or f"https://{clean_name}.com/privacy",
+                        "policy_url_source": "known_mapping",
+                        "score": cal_score,
+                        "band": band,
+                        "status": "ok",
+                        "message": None,
+                        "clauses": contract_clauses
+                    }), 200
+                conn.close()
+            except Exception as e:
+                logging.warning(f"DB lookup in compare failed: {e}")
+
+    # If still no text could be found or provided
+    if not text:
+        return jsonify({
+            "service": service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": None,
+            "band": None,
+            "status": "error",
+            "message": f"Could not find or fetch privacy policy text for '{service_name}'. Provide a policy URL or paste text.",
+            "clauses": []
+        }), 200
+
+    # Validate that text is plausibly a privacy policy
+    if not is_plausible_privacy_policy(text, url, service_name):
+        return jsonify({
+            "service": service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": None,
+            "band": None,
+            "status": "not_a_policy",
+            "message": "This page doesn't look like a privacy policy. Open the policy page directly or paste the text.",
+            "clauses": []
+        }), 200
+
+    # Extract & Score
+    try:
+        extracted = extract_pipeline(text, service_name)
+        extracted_clauses = extracted.get("clauses", [])
+        raw_score = policy_risk_score(extracted_clauses)
+        calibrated = calibrate_score(raw_score) if extracted_clauses else 0
+        band = get_risk_band(calibrated) if extracted_clauses else "very_low"
+
+        contract_clauses = [
+            {
+                "type": c.get("type", "other"),
+                "meaning": c.get("meaning", "General privacy clause regarding service operation."),
+                "what_you_can_do": c.get("what_you_can_do", "Review your account privacy choices."),
+                "excerpt": c.get("excerpt", c.get("text", ""))
+            }
+            for c in extracted_clauses
+        ]
+
+        return jsonify({
+            "service": extracted.get("service_name") or service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": calibrated,
+            "band": band,
+            "status": "ok",
+            "message": None,
+            "clauses": contract_clauses
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "service": service_name,
+            "policy_url": url,
+            "policy_url_source": "page_search",
+            "score": None,
+            "band": None,
+            "status": "error",
+            "message": f"Extraction error: {str(e)}",
+            "clauses": []
+        }), 500
+
 
 @app.route('/api/proxy-fetch', methods=['POST', 'OPTIONS'])
 def proxy_fetch():

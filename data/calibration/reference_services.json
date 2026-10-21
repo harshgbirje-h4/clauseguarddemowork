@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Instagram",
+    "domain": "instagram.com",
+    "policy_url": "https://privacycenter.instagram.com/policy"
+  },
+  {
+    "name": "LinkedIn",
+    "domain": "linkedin.com",
+    "policy_url": "https://www.linkedin.com/legal/privacy-policy"
+  },
+  {
+    "name": "Microsoft Teams",
+    "domain": "teams.microsoft.com",
+    "policy_url": "https://privacy.microsoft.com/en-us/privacystatement"
+  },
+  {
+    "name": "Spotify",
+    "domain": "spotify.com",
+    "policy_url": "https://www.spotify.com/legal/privacy-policy/"
+  },
+  {
+    "name": "Google",
+    "domain": "google.com",
+    "policy_url": "https://policies.google.com/privacy"
+  },
+  {
+    "name": "Apple",
+    "domain": "apple.com",
+    "policy_url": "https://www.apple.com/legal/privacy/"
+  },
+  {
+    "name": "Netflix",
+    "domain": "netflix.com",
+    "policy_url": "https://help.netflix.com/legal/privacy"
+  },
+  {
+    "name": "Zoom",
+    "domain": "zoom.us",
+    "policy_url": "https://www.zoom.com/en/trust/privacy/privacy-statement/"
+  },
+  {
+    "name": "Slack",
+    "domain": "slack.com",
+    "policy_url": "https://slack.com/privacy"
+  },
+  {
+    "name": "Dropbox",
+    "domain": "dropbox.com",
+    "policy_url": "https://www.dropbox.com/privacy"
+  },
+  {
+    "name": "OpenAI",
+    "domain": "openai.com",
+    "policy_url": "https://openai.com/privacy/"
+  },
+  {
+    "name": "Claude",
+    "domain": "claude.ai",
+    "policy_url": "https://www.anthropic.com/legal/privacy"
+  },
+  {
+    "name": "GitHub",
+    "domain": "github.com",
+    "policy_url": "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+  },
+  {
+    "name": "Reddit",
+    "domain": "reddit.com",
+    "policy_url": "https://www.reddit.com/policies/privacy-policy"
+  },
+  {
+    "name": "Gaana",
+    "domain": "gaana.com",
+    "policy_url": "https://gaana.com/privacy_policy.html"
+  },
+  {
+    "name": "Amazon",
+    "domain": "amazon.com",
+    "policy_url": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ"
+  }
+]

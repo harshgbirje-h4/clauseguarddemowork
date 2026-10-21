@@ -1,0 +1,82 @@
+{
+  "data_deletion": {
+    "meaning": "The service explains how you can request deletion of your account and personal records.",
+    "what_you_can_do": "Ask the service to delete your account and erase your personal data."
+  },
+  "refund": {
+    "meaning": "The policy outlines whether and how you can get your money back after a transaction.",
+    "what_you_can_do": "Contact customer support within the refund eligibility period to request your money back."
+  },
+  "return_policy": {
+    "meaning": "The policy describes the rules and timeframes for returning purchased goods or services.",
+    "what_you_can_do": "Return items in their original condition within the required time limit."
+  },
+  "subscription_cancellation": {
+    "meaning": "The policy explains the terms for ending a recurring paid subscription.",
+    "what_you_can_do": "Cancel your subscription before the next billing cycle begins to prevent future charges."
+  },
+  "auto_renewal": {
+    "meaning": "Your plan automatically renews and charges your payment method unless you cancel it before the renewal date.",
+    "what_you_can_do": "Turn off automatic renewal in your billing preferences before the renewal date."
+  },
+  "account_deletion": {
+    "meaning": "The service explains how you can request deletion of your account and personal records.",
+    "what_you_can_do": "Ask the service to delete your account and erase your personal data."
+  },
+  "data_collection": {
+    "meaning": "The service collects your personal information, contact details, and device identifiers.",
+    "what_you_can_do": "Share only the minimum necessary information required to use the service."
+  },
+  "third_party_sharing": {
+    "meaning": "The service shares your personal information with external business partners, vendors, or service providers.",
+    "what_you_can_do": "The policy doesn't describe a way to opt out."
+  },
+  "data_selling": {
+    "meaning": "The service shares or sells your personal information to third parties in exchange for money or other commercial benefits.",
+    "what_you_can_do": "Submit a request asking the service not to sell your personal information."
+  },
+  "targeted_advertising": {
+    "meaning": "The service monitors your activity and interests across websites to deliver personalized advertisements.",
+    "what_you_can_do": "Opt out of personalized advertising or reset your device advertising identifier."
+  },
+  "data_retention": {
+    "meaning": "The service specifies how long your personal information is stored before it is deleted or anonymized.",
+    "what_you_can_do": "Ask the service to delete your stored personal data if you no longer use the service."
+  },
+  "data_security": {
+    "meaning": "The service outlines the technical and administrative safeguards used to protect your personal data from unauthorized access.",
+    "what_you_can_do": "Protect your account with a strong, unique password and enable two-factor authentication."
+  },
+  "user_rights": {
+    "meaning": "The service describes legal privacy rights you have to access, inspect, download, or correct your personal data.",
+    "what_you_can_do": "Submit a formal data request to access, correct, or download a copy of your personal data."
+  },
+  "opt_out": {
+    "meaning": "The service describes choices you have to stop receiving marketing communications or non-essential features.",
+    "what_you_can_do": "Use unsubscribe links in messages or adjust your communication preferences to stop promotional outreach."
+  },
+  "cookies_tracking": {
+    "meaning": "The service places cookies and browser trackers on your device to remember preferences and track your visits.",
+    "what_you_can_do": "Reject non-essential cookies using the site cookie banner or block cookies in your browser."
+  },
+  "location_tracking": {
+    "meaning": "The service tracks your physical location and movements using GPS, IP address, or mobile sensors.",
+    "what_you_can_do": "Disable location permissions for the service in your device settings."
+  },
+  "biometric_data": {
+    "meaning": "The service collects sensitive physiological characteristics such as facial geometry, fingerprints, or voiceprints.",
+    "what_you_can_do": "Decline to enable features that require facial recognition or biometric scanning."
+  },
+  "children_privacy": {
+    "meaning": "The service describes its privacy rules regarding minors and whether children are permitted to use the platform.",
+    "what_you_can_do": "Use parental controls or ask the service to delete a child's account if created without consent."
+  },
+  "policy_changes": {
+    "meaning": "The service explains how it updates its terms and whether users receive notice before changes take effect.",
+    "what_you_can_do": "The policy doesn't describe a way to opt out."
+  },
+  "other": {
+    "meaning": "The service includes general terms and auxiliary privacy statements that govern use of the service.",
+    "what_you_can_do": "The policy doesn't describe a way to opt out."
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "openai.com": {
+    "name": "OpenAI",
+    "policy_url": "https://openai.com/privacy/",
+    "related_domains": [
+      "chatgpt.com",
+      "chat.openai.com"
+    ]
+  },
+  "claude.ai": {
+    "name": "Claude",
+    "policy_url": "https://www.anthropic.com/legal/privacy",
+    "related_domains": [
+      "anthropic.com"
+    ]
+  },
+  "microsoft.com": {
+    "name": "Microsoft",
+    "policy_url": "https://privacy.microsoft.com/en-us/privacystatement",
+    "related_domains": [
+      "microsoftonline.com",
+      "office.com",
+      "live.com"
+    ]
+  },
+  "microsoftonline.com": {
+    "name": "Microsoft Online",
+    "policy_url": "https://privacy.microsoft.com/en-us/privacystatement",
+    "related_domains": [
+      "microsoft.com",
+      "office.com",
+      "login.microsoftonline.com"
+    ]
+  },
+  "instagram.com": {
+    "name": "Instagram",
+    "policy_url": "https://privacycenter.instagram.com/policy",
+    "related_domains": [
+      "meta.com",
+      "facebook.com"
+    ]
+  },
+  "linkedin.com": {
+    "name": "LinkedIn",
+    "policy_url": "https://www.linkedin.com/legal/privacy-policy",
+    "related_domains": [
+      "licdn.com"
+    ]
+  },
+  "spotify.com": {
+    "name": "Spotify",
+    "policy_url": "https://www.spotify.com/legal/privacy-policy/",
+    "related_domains": [
+      "scdn.co"
+    ]
+  },
+  "teams.microsoft.com": {
+    "name": "Microsoft Teams",
+    "policy_url": "https://privacy.microsoft.com/en-us/privacystatement",
+    "related_domains": [
+      "microsoft.com",
+      "teams.com"
+    ]
+  },
+  "gaana.com": {
+    "name": "Gaana",
+    "policy_url": "https://gaana.com/privacy_policy.html",
+    "related_domains": []
+  },
+  "google.com": {
+    "name": "Google",
+    "policy_url": "https://policies.google.com/privacy",
+    "related_domains": [
+      "youtube.com",
+      "gmail.com"
+    ]
+  },
+  "apple.com": {
+    "name": "Apple",
+    "policy_url": "https://www.apple.com/legal/privacy/",
+    "related_domains": [
+      "icloud.com"
+    ]
+  },
+  "netflix.com": {
+    "name": "Netflix",
+    "policy_url": "https://help.netflix.com/legal/privacy",
+    "related_domains": [
+      "nflxso.net",
+      "nflxext.com"
+    ]
+  },
+  "zoom.us": {
+    "name": "Zoom",
+    "policy_url": "https://www.zoom.com/en/trust/privacy/privacy-statement/",
+    "related_domains": [
+      "zoom.com"
+    ]
+  },
+  "slack.com": {
+    "name": "Slack",
+    "policy_url": "https://slack.com/privacy",
+    "related_domains": []
+  },
+  "dropbox.com": {
+    "name": "Dropbox",
+    "policy_url": "https://www.dropbox.com/privacy",
+    "related_domains": []
+  },
+  "github.com": {
+    "name": "GitHub",
+    "policy_url": "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement",
+    "related_domains": [
+      "githubusercontent.com"
+    ]
+  },
+  "reddit.com": {
+    "name": "Reddit",
+    "policy_url": "https://www.reddit.com/policies/privacy-policy",
+    "related_domains": [
+      "redditinc.com",
+      "redd.it"
+    ]
+  },
+  "amazon.com": {
+    "name": "Amazon",
+    "policy_url": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ",
+    "related_domains": [
+      "amazon.in",
+      "media-amazon.com"
+    ]
+  }
+}

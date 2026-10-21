@@ -68,6 +68,43 @@ function extractPageText() {
     };
 }
 
+function getApexDomain(hostname) {
+    if (!hostname) return "";
+    const parts = hostname.toLowerCase().split('.');
+    if (parts.length <= 2) return parts.join('.');
+    const secondLast = parts[parts.length - 2];
+    if (['co', 'com', 'org', 'net', 'edu', 'gov'].includes(secondLast) && parts.length >= 3) {
+        return parts.slice(-3).join('.');
+    }
+    return parts.slice(-2).join('.');
+}
+
+function isThirdPartyAuthOrWidget(linkHref, currentHost) {
+    try {
+        const linkObj = new URL(linkHref);
+        const linkApex = getApexDomain(linkObj.hostname);
+        const currentApex = getApexDomain(currentHost);
+
+        // Same domain or same organization subdomain is NOT third party
+        if (linkApex === currentApex) {
+            return false;
+        }
+
+        // Known third-party auth providers, captchas, and widgets that inject their own policies
+        const widgetApexes = [
+            'google.com', 'facebook.com', 'apple.com', 'recaptcha.net', 
+            'cloudflare.com', 'hcaptcha.com', 'turnstile.com', 'gstatic.com', 
+            'live.com', 'microsoftonline.com'
+        ];
+        if (widgetApexes.some(w => linkObj.hostname.includes(w) || linkApex === w)) {
+            return true;
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
 // Find a link to the site's privacy policy from the DOM
 function findPrivacyPolicyLink() {
     const links = Array.from(document.querySelectorAll('a'));
@@ -78,6 +115,10 @@ function findPrivacyPolicyLink() {
         if (h.startsWith('javascript:') || h === '#' || h.startsWith('mailto:') || h.startsWith('tel:')) return true;
         // Never select an auth / signin / login / password link as a privacy policy
         if (h.match(/\/(login|signin|sign-in|signup|sign-up|oauth|passwordreset|join)\b/i) || h.includes('trk=guest_homepage') || h.includes('fromsignin=true')) {
+            return true;
+        }
+        // Exclude foreign third-party OAuth/captcha disclaimer policies (e.g. Google reCAPTCHA on Spotify/GitHub)
+        if (isThirdPartyAuthOrWidget(href, window.location.hostname)) {
             return true;
         }
         return false;
@@ -91,7 +132,7 @@ function findPrivacyPolicyLink() {
         }
     }
 
-    // Pass 1: exact or high-confidence anchor text
+    // Pass 1: exact or high-confidence anchor text (Same-Domain)
     for (const a of links) {
         const rawHref = a.getAttribute('href') || a.href || "";
         const absHref = makeAbsolute(rawHref);
@@ -102,7 +143,7 @@ function findPrivacyPolicyLink() {
         }
     }
     
-    // Pass 2: URL structure contains explicit privacy policy path
+    // Pass 2: URL structure contains explicit privacy policy path (Same-Domain)
     for (const a of links) {
         const rawHref = a.getAttribute('href') || a.href || "";
         const absHref = makeAbsolute(rawHref);
@@ -114,7 +155,7 @@ function findPrivacyPolicyLink() {
         }
     }
 
-    // Pass 3: anchor text contains privacy policy / notice / statement
+    // Pass 3: anchor text contains privacy policy / notice / statement (Same-Domain)
     for (const a of links) {
         const rawHref = a.getAttribute('href') || a.href || "";
         const absHref = makeAbsolute(rawHref);
@@ -125,7 +166,7 @@ function findPrivacyPolicyLink() {
         }
     }
 
-    // Pass 4: general privacy link with valid privacy URL
+    // Pass 4: general privacy link with valid privacy URL (Same-Domain)
     for (const a of links) {
         const rawHref = a.getAttribute('href') || a.href || "";
         const absHref = makeAbsolute(rawHref);
@@ -135,6 +176,16 @@ function findPrivacyPolicyLink() {
         if ((text === "privacy" || text.includes("privacy")) && (hLower.includes("privacy") || hLower.includes("legal") || hLower.includes("policy"))) {
             return { href: absHref, text: (a.innerText || a.textContent || "").trim() || "Privacy Policy" };
         }
+    }
+
+    // Pass 5: Fallback canonical discovery for minimal login cards
+    // (e.g. accounts.spotify.com where the login card doesn't include the main site footer)
+    const currentApex = getApexDomain(window.location.hostname);
+    if (currentApex && !['google.com', 'chrome', 'localhost', '127.0.0.1'].includes(currentApex)) {
+        return {
+            href: `https://www.${currentApex}/privacy`,
+            text: `Privacy Policy (${currentApex.split('.')[0].toUpperCase()})`
+        };
     }
 
     return null;
@@ -238,12 +289,13 @@ async function initActiveLoginShield() {
         const policyText = fullPolicyText.substring(0, MAX_POLICY_CHARS);
         const policyTruncated = fullPolicyText.length > MAX_POLICY_CHARS;
 
+        const actualPolicyUrl = (proxyRes.data && proxyRes.data.final_url) || privacyLink.href;
         updateShieldUI("Analyzing risks via ClauseGuard engine...", "blue");
 
         const analyzeRes = await sendBgMessage("bg_analyze_policy", {
             payload: {
                 text: policyText,
-                url: privacyLink.href,
+                url: actualPolicyUrl,
                 title: document.title,
                 truncated: policyTruncated
             }
@@ -265,7 +317,7 @@ async function initActiveLoginShield() {
             [cacheKey]: {
                 url: host,
                 page_url: window.location.href,
-                policy_url: privacyLink.href,
+                policy_url: actualPolicyUrl,
                 timestamp: Date.now(),
                 data: analysisData,
                 newEntities: newEntities,

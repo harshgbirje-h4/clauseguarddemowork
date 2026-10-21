@@ -928,9 +928,10 @@ def proxy_fetch():
         )
         with urllib.request.urlopen(req, timeout=12) as response:
             html = response.read().decode('utf-8', errors='replace')
+            final_url = response.geturl()
             if "Just a moment..." in html or "cloudflare" in html.lower() or "datadome" in html.lower():
                 return jsonify({"error": "Website anti-bot protection blocked the background fetch."}), 403
-            return jsonify({"html": html}), 200
+            return jsonify({"html": html, "final_url": final_url}), 200
     except urllib.error.HTTPError as he:
         return jsonify({"error": f"HTTP {he.code}: {he.reason}"}), 403 if he.code in [401, 403] else 500
     except Exception as e:

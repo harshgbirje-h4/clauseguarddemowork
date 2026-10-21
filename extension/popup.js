@@ -300,10 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 return;
                             }
 
+                            const finalPolicyUrl = proxyData.final_url || targetLink.href;
                             showStatus("Policy fetched successfully. Analysing with ClauseGuard engine...", "info");
                             await runAnalysis({
                                 text: policyText,
-                                url: targetLink.href,
+                                url: finalPolicyUrl,
                                 title: pageData.title,
                                 truncated: truncated
                             });

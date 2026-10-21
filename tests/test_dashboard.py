@@ -138,5 +138,20 @@ class TestDashboardAPI(unittest.TestCase):
         response = self.app.post('/api/compare-services', json={"bad": "data"})
         self.assertEqual(response.status_code, 400)
 
+    def test_reset_portfolio(self):
+        res1 = self.app.get('/api/portfolio')
+        self.assertEqual(len(json.loads(res1.data)["services"]), 1)
+
+        res2 = self.app.post('/api/portfolio/reset')
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(json.loads(res2.data)["status"], "success")
+
+        res3 = self.app.get('/api/portfolio')
+        self.assertEqual(res3.status_code, 200)
+        data = json.loads(res3.data)
+        self.assertEqual(len(data["services"]), 0)
+        self.assertEqual(data["portfolio_score"], 0.0)
+        self.assertEqual(data["portfolio_risk_0_100"], 0.0)
+
 if __name__ == '__main__':
     unittest.main()

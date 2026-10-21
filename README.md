@@ -1,98 +1,112 @@
 # ClauseGuard
 
-ClauseGuard is a completed student/research prototype for analyzing, standardizing, and tracking privacy policy risks across digital services.
+ClauseGuard is a privacy intelligence prototype for analyzing, standardizing, and tracking privacy policy risks across digital services.
 
 ## Features
-* **Privacy-policy extraction**: Extracts privacy clauses from raw policy text.
-* **Canonicalization**: Normalizes disparate data terms into canonical entities.
-* **Portfolio storage**: Securely stores the privacy footprint in a local SQLite database.
-* **Risk scoring**: Quantifies clause and service risks via severity and specificity parameters.
-* **Marginal risk**: Calculates the exact added risk a candidate service introduces to an existing portfolio.
-* **Evaluation**: A strictly validated, mathematically sound evaluation foundation with anti-leakage systems.
-* **Live dashboard**: A Flask-based interactive portfolio dashboard.
-* **Chrome extension**: A lightweight browser extension for analyzing policies on the fly.
+* **4-Question Privacy Scanner**: Organizes privacy findings into 4 clear questions:
+  1. *What data is collected?* (canonical entities with policy source evidence)
+  2. *Who is it shared with?* (distinguishes data sales, marketing partners, and service providers)
+  3. *What can I control?* (documented deletion procedures, opt-outs, and tracking preferences)
+  4. *Has anything changed?* (detects policy diffs against previously saved versions)
+* **Privacy Exposure Ledger**: Compiles cumulative data permissions across services into a single de-duplicated portfolio ledger without implying cross-service sharing.
+* **Canonicalization**: Normalizes disparate data terminology into canonical data categories.
+* **Local Portfolio Storage**: Securely stores the user's privacy footprint in a local SQLite database (`data/db/portfolio.db`). Starts clean (0 services) by default.
+* **Marginal Risk & Comparator**: Compares candidate services side by side against your portfolio footprint to evaluate newly introduced data exposure.
+* **Chrome Extension**: A Manifest V3 extension for scanning websites on the fly or pasting policy text manually.
 
 ## Architecture
 ```
-Privacy Policy webpage
+Website / Privacy Policy Page
        ↓
-Chrome Extension (Client)
+Chrome Extension or Web Scanner
        ↓
-Flask Backend /api/analyze-policy
+Flask Backend (/api/analyze-policy)
        ↓
-[C1] Extraction (Prefilter + LLM)
+[C1] Extraction (Prefilter + LLM / Regex Fallback)
        ↓
-[C2] Canonicalization
+[C2] Canonicalization & Traceability
        ↓
-[C4] Scoring Engine & [C5] Marginal Risk
+[C4] Bounded Scoring (0-100) & Coverage Reporting
        ↓
-[C3] SQLite Portfolio Storage (Local DB)
+[C3] SQLite Portfolio Storage (data/db/portfolio.db)
 ```
-
-## Requirements
-* Python 3.9+
-* Required dependencies are listed in `requirements.txt`.
 
 ## Setup
 
-Run the following commands in your terminal (Windows):
+1. **Clone and enter the directory**:
+   ```powershell
+   git clone <repo-url>
+   cd clauseguard
+   ```
 
-```powershell
-cd D:\clauseguard
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
+2. **Create and activate a virtual environment**:
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
 
-## Run Demo
+3. **Install dependencies**:
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
-Run the end-to-end Python demo (spins up a temporary DB to protect your real portfolio):
-```powershell
-python run_demo.py
-```
+4. **Environment Configuration**:
+   Create a `.env` file (or copy `.env.example`):
+   ```ini
+   GEMINI_API_KEY=your_key_here
+   GEMINI_MODEL=gemini-1.5-flash
+   ```
+   *(If no API key is configured, ClauseGuard automatically operates in offline `MOCK/DEV` mode for local testing).*
 
-## Run Dashboard
+---
 
-Start the live dashboard:
+## Running the Dashboard
+
+Start the local Flask dashboard:
 ```powershell
 python src/dashboard.py
 ```
-Then open your web browser to: [http://127.0.0.1:5000](http://127.0.0.1:5000)
+Open your browser to: **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
 
-## Real API Integration (Gemini)
+### Portfolio Lifecycle (Clean Start by Default)
+* **Empty by Default**: When started for the first time or cloned, the portfolio contains **0 services**.
+* **Adding Services**: A service only appears on the dashboard after you analyze a policy and click **"Add to Portfolio"** (either via the Chrome extension or using the **Direct Policy Scanner** tab on the web dashboard).
+* **Resetting the Portfolio**: You can reset your portfolio back to an empty state at any time by:
+  * Clicking the **"Clear Portfolio"** button in the top-right of the Current Portfolio card on the dashboard, OR
+  * Running the reset command in terminal:
+    ```powershell
+    python src/db.py --reset
+    ```
+    or launching the dashboard with the reset flag:
+    ```powershell
+    python src/dashboard.py --reset
+    ```
 
-ClauseGuard natively integrates with Google's Gemini API for semantic entity extraction.
+---
 
-1. **MOCK/DEV Mode (Default):** If no API key is provided, ClauseGuard automatically uses a deterministic regex fallback mode for local testing. It clearly marks results with `mode: "MOCK/DEV"`.
-2. **Real Gemini Mode:** To enable real semantic extraction:
-   ```powershell
-   set GEMINI_API_KEY=YOUR_REAL_KEY
-   set GEMINI_MODEL=gemini-1.5-flash
-   python src/dashboard.py
-   ```
-   A successful API request will mark the extracted service with `mode: "GEMINI"`. If the API fails or you hit rate limits, the request explicitly errors rather than silently falling back to mock data. API limits depend entirely on your Google account.
+## Chrome Extension Setup
 
-## Chrome Extension
-
-To use the Chrome Extension:
-1. Ensure the backend is running (`python src/dashboard.py`).
+1. Ensure the backend server is running (`python src/dashboard.py`).
 2. Open Chrome and navigate to `chrome://extensions/`.
-3. Enable **Developer mode** in the top right.
-4. Click **Load unpacked** and select the `D:\clauseguard\extension` directory.
-5. Open a real privacy policy webpage (e.g., Spotify's privacy policy).
-6. Click the ClauseGuard extension icon and click **Analyze Policy**.
+3. Enable **Developer mode** (toggle in the top-right corner).
+4. Click **Load unpacked** and select the `extension/` directory from this repository.
+5. Visit any website (e.g. `spotify.com` or any service login/homepage).
+6. Click the **ClauseGuard** extension icon:
+   * Click **Analyze Website** to automatically discover and analyze the linked privacy policy.
+   * If automated scanning is blocked by Cloudflare or anti-bot firewalls, click **"Open Privacy Policy Page ↗"** or **"Paste text manually instead"**.
+   * Review the 4 questions (*What is collected*, *Who is it shared with*, *What can I control*, *Has anything changed*).
+   * Click **"Add to Portfolio"** to save the service to your local database. It will immediately appear on the web dashboard.
 
-*(Note: Chrome integration has been verified against proxy payloads, but not manually verified inside an actual physical browser instance.)*
+---
 
-## Testing
+## Running Automated Tests
 
-Run the full automated test suite:
+Run the full automated test suite (all tests use isolated temporary databases to keep your portfolio pristine):
 ```powershell
-python -m unittest discover -s tests -p "test_*.py"
+python -m unittest discover tests
 ```
 
-## Prototype Limitations
-Please note the following constraints on this prototype:
-* **Production ML:** The system is an MVP concept. The ML Prefilter is trained on an 8-sentence mock dataset, not OPP-115.
-* **Risk Probability:** Risk scores are deterministic calculations, not empirically verified probabilities of privacy breaches.
-* **Marginal Overlap:** The overlap system discounts overlapping clauses by a hardcoded deterministic factor (`W_overlap=0.5`). 
+To run the end-to-end demo runner:
+```powershell
+python run_demo.py
+```

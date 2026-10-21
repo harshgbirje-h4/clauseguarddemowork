@@ -537,8 +537,11 @@
       <div class="grid-portfolio">
         <!-- Current Portfolio Sheet -->
         <div class="sheet">
-          <h2 class="sheet-title">Current Portfolio</h2>
-          <p class="sheet-sub">Overall data exposure across your services (shared data counted once).</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <h2 class="sheet-title" style="margin-bottom: 0;">Current Portfolio</h2>
+            <button id="reset-portfolio-btn" class="btn ghost small" style="font-size: 12px; padding: 4px 10px;" title="Reset portfolio to 0 services">Clear Portfolio</button>
+          </div>
+          <p class="sheet-sub">De-duplicated portfolio exposure based on worst-case disclosures per data type.</p>
 
           <div class="score-box">
             <div class="score-label">Portfolio Risk Score</div>
@@ -951,7 +954,9 @@
       candB.innerHTML = '<option value="">-- Or select from saved portfolio --</option>';
 
       if (!data.services || data.services.length === 0) {
-        serviceList.innerHTML = '<li class="empty-state">No services stored in portfolio yet.</li>';
+        serviceList.innerHTML = '<li class="empty-state" style="padding: 18px 10px; line-height: 1.5;"><strong>No services stored in portfolio yet.</strong><br><span style="font-size: 13px; color: var(--ink-3);">Scan a website using the Chrome extension or Direct Policy Scanner tab, then click &ldquo;Add to Portfolio&rdquo; to see its privacy footprint here.</span></li>';
+        candA.innerHTML = '<option value="">-- No Services Available --</option>';
+        candB.innerHTML = '<option value="">-- No Services Available --</option>';
       } else {
         data.services.forEach(s => {
           const sRisk = s.service_score || 0;
@@ -1258,6 +1263,26 @@
         btn.textContent = "Retry Add";
       }
     });
+
+    const resetBtn = document.getElementById('reset-portfolio-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        if (!confirm("Are you sure you want to clear all stored services from your portfolio?")) return;
+        resetBtn.disabled = true;
+        resetBtn.innerText = "Clearing...";
+        try {
+          const res = await fetch('/api/portfolio/reset', { method: 'POST' });
+          if (!res.ok) throw new Error("Failed to reset portfolio.");
+          showStatus("Portfolio successfully cleared.", false);
+          await loadPortfolio();
+        } catch (e) {
+          showStatus(e.message, true);
+        } finally {
+          resetBtn.disabled = false;
+          resetBtn.innerText = "Clear Portfolio";
+        }
+      });
+    }
 
     loadPortfolio();
   </script>

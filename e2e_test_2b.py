@@ -15,7 +15,7 @@ try:
     
     import sys
     sys.path.insert(0, os.path.abspath('src'))
-    from db import init_db
+    from db import init_db, reset_db
     init_db(db_path)
     
     # 1. Save Service A
@@ -96,5 +96,11 @@ try:
     print("End-to-end Phase 2B test passed!")
 
 finally:
+    # Always restore database to clean state after test
+    try:
+        from db import reset_db
+        reset_db(db_path)
+    except Exception:
+        pass
     flask_process.terminate()
     flask_process.wait()

@@ -459,6 +459,18 @@ def save_service():
         logging.error(f"Save failed: {e}")
         return jsonify({"error": f"Failed to save service: {str(e)}"}), 500
 
+@app.route('/api/portfolio/reset', methods=['POST', 'OPTIONS'])
+@app.route('/api/reset-portfolio', methods=['POST', 'OPTIONS'])
+def reset_portfolio_endpoint():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    try:
+        from src.db import reset_db
+        reset_db(DB_PATH)
+        return jsonify({"status": "success", "message": "Portfolio database reset to empty state (0 services)."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/overlap-graph', methods=['GET'])
 def get_overlap_graph():
     if not os.path.exists(DB_PATH):
@@ -937,7 +949,22 @@ def proxy_fetch():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+def run_server():
+    import argparse
+    parser = argparse.ArgumentParser(description="ClauseGuard Dashboard Server")
+    parser.add_argument("--reset", "--clean", dest="reset", action="store_true", help="Reset portfolio database to empty state (0 services) on launch")
+    parser.add_argument("--port", type=int, default=5000, help="Port to run server on")
+    args, _ = parser.parse_known_args()
+
+    from src.db import init_db, reset_db
+    if args.reset:
+        reset_db(DB_PATH)
+    elif not os.path.exists(DB_PATH):
+        init_db(DB_PATH)
+
     print("Starting ClauseGuard Dashboard...")
-    print("Open http://127.0.0.1:5000 in your browser.")
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    print(f"Open http://127.0.0.1:{args.port} in your browser.")
+    app.run(host='127.0.0.1', port=args.port, debug=True)
+
+if __name__ == '__main__':
+    run_server()

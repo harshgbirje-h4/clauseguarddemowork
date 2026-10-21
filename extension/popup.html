@@ -16,16 +16,16 @@
   </header>
 
   <main>
-    <!-- Current Website Overview Card -->
-    <div class="card site-card">
+    <!-- 1. Service Overview Card -->
+    <div class="card site-card" id="site-card">
       <div class="site-header-row">
         <div>
           <span class="label-tiny">CURRENT WEBSITE</span>
           <div id="site-name" class="site-title">Detecting...</div>
         </div>
         <div class="site-badges">
-          <span id="portfolio-badge" class="badge neutral">Checking...</span>
-          <span id="scan-badge" class="badge neutral">Not Scanned</span>
+          <span id="portfolio-badge" class="badge saved hidden">In Portfolio</span>
+          <span id="scan-badge" class="badge neutral">Not scanned</span>
         </div>
       </div>
 
@@ -40,107 +40,49 @@
       </div>
 
       <div class="scan-actions">
-        <button id="analyze-btn" class="btn primary">Analyze Website</button>
-        <button id="toggle-paste-btn" class="btn-link" type="button">Paste text manually instead</button>
+        <button id="analyze-btn" class="btn primary">Scan Website</button>
+        <button id="toggle-paste-btn" class="btn-link" type="button">Paste text instead</button>
       </div>
 
-      <!-- Manual Paste Fallback Section (Problem 1) -->
+      <!-- Manual Paste Fallback Section -->
       <div id="paste-section" class="paste-box hidden">
         <div class="paste-head">
           <span class="paste-title">Manual Policy Input</span>
-          <span class="hint">Use this if the policy is blocked by anti-bot firewalls or spread across multiple pages.</span>
+          <span class="hint">Use this if the policy is blocked by website protections or spread across multiple pages.</span>
         </div>
         <textarea id="paste-text" rows="4" placeholder="Paste privacy policy text here..."></textarea>
         <button id="paste-analyze-btn" class="btn small">Analyze Pasted Text</button>
       </div>
     </div>
 
-    <!-- Live Status / Progress / Error Banner -->
+    <!-- Live Status / Message Banner (Shown on status message or error) -->
     <div id="status" class="status hidden" role="status" aria-live="polite"></div>
 
-    <!-- Analysis Results Section (Redesigned around 4 Questions) -->
+    <!-- ITEM 1: Unscanned Service Reminder Card -->
+    <div id="unscanned-reminder" class="card reminder-card">
+      <div class="reminder-content">
+        <span class="reminder-icon">🛡️</span>
+        <div class="reminder-text">
+          <strong>This service has not been scanned yet.</strong>
+          <p>Scan this website to see how it handles your personal data, what it shares with advertisers, and how easy it is to delete your account.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scanned Analysis Results (Hidden when unscanned, not_a_policy, or blocked) -->
     <div id="results" class="hidden">
-      
-      <!-- QUESTION 1: What data is collected? -->
-      <section class="card q-card" id="card-q1">
-        <div class="q-header" data-toggle="q1-body">
-          <div class="q-title-group">
-            <span class="q-num">1</span>
-            <div>
-              <h3 class="q-title">What data is collected?</h3>
-              <p class="q-sub" id="q1-sub">Categories and evidence from policy</p>
-            </div>
-          </div>
-          <span class="q-chevron">▾</span>
-        </div>
-        <div class="q-body" id="q1-body">
-          <div id="collection-chips" class="chips-container"></div>
-          <div id="collection-findings-list" class="findings-list"></div>
-        </div>
-      </section>
 
-      <!-- QUESTION 2: Who is it shared with? -->
-      <section class="card q-card" id="card-q2">
-        <div class="q-header" data-toggle="q2-body">
-          <div class="q-title-group">
-            <span class="q-num">2</span>
-            <div>
-              <h3 class="q-title">Who is it shared with?</h3>
-              <p class="q-sub" id="q2-sub">Recipients, partners, and data sale disclosures</p>
-            </div>
-          </div>
-          <span class="q-chevron">▾</span>
-        </div>
-        <div class="q-body" id="q2-body">
-          <div id="sharing-findings-list" class="findings-list"></div>
-        </div>
-      </section>
-
-      <!-- QUESTION 3: What can I control? -->
-      <section class="card q-card" id="card-q3">
-        <div class="q-header" data-toggle="q3-body">
-          <div class="q-title-group">
-            <span class="q-num">3</span>
-            <div>
-              <h3 class="q-title">What can I control?</h3>
-              <p class="q-sub" id="q3-sub">Documented opt-outs, deletion, and settings</p>
-            </div>
-          </div>
-          <span class="q-chevron">▾</span>
-        </div>
-        <div class="q-body" id="q3-body">
-          <div id="control-findings-list" class="findings-list"></div>
-        </div>
-      </section>
-
-      <!-- QUESTION 4: Has anything changed? -->
-      <section class="card q-card" id="card-q4">
-        <div class="q-header" data-toggle="q4-body">
-          <div class="q-title-group">
-            <span class="q-num">4</span>
-            <div>
-              <h3 class="q-title">Has anything changed?</h3>
-              <p class="q-sub" id="q4-sub">Comparison with previous policy scan</p>
-            </div>
-          </div>
-          <span class="q-chevron">▾</span>
-        </div>
-        <div class="q-body" id="q4-body">
-          <div id="change-findings-box" class="change-box"></div>
-        </div>
-      </section>
-
-      <!-- Secondary Risk Score & Audit Summary -->
+      <!-- 2. Overall Score Section (Large & Prominent) -->
       <section class="card score-card" id="card-score-summary">
         <div class="score-row">
           <div>
             <div class="score-display">
               <b id="risk-score">0</b><span class="score-denom">/100</span>
             </div>
-            <span class="score-caption">Overall Privacy Risk (Secondary Metric)</span>
+            <span class="score-caption">Overall Privacy Risk</span>
           </div>
           <div class="score-badge-box">
-            <span id="risk-band" class="band Inconclusive">Inconclusive</span>
+            <span id="risk-band" class="band Typical">Typical for everyday apps</span>
           </div>
         </div>
 
@@ -148,37 +90,44 @@
           <i id="gauge-fill" style="width: 0%;"></i>
         </div>
 
-        <div class="score-explanation">
-          Calculated from the severity and specificity of the top 5 highest-risk clauses.
+        <div class="score-explanation" id="score-explanation">
+          Calculated from the top 5 highest-risk clauses, compared with everyday apps.
         </div>
-
-        <!-- Coverage & Audit Transparency (Problem 4) -->
-        <div id="coverage-note" class="coverage-box"></div>
-
-        <!-- Expandable Raw Clauses -->
-        <div class="clauses-toggle-row">
-          <span class="clauses-count-label">Extracted Clauses (<span id="clause-count">0</span>)</span>
-          <button id="toggle-clauses-btn" class="btn-link" type="button">View all clauses</button>
-        </div>
-        <div id="clauses-details" class="clauses-details-box hidden"></div>
       </section>
 
-      <!-- Quick Portfolio Comparison (Problem 6) -->
+      <!-- 3. Compare with another service (Directly below score) -->
       <section class="card compare-card" id="compare-section">
         <div class="compare-head">
-          <h4 class="compare-title">Compare with Saved Portfolio Website</h4>
-          <span class="hint">Inspect overlapping disclosed data practices without implying cross-service sharing:</span>
+          <h4 class="compare-title">Compare with another service</h4>
+          <span class="hint">Search saved services or type any service name to compare:</span>
         </div>
-        <div class="compare-row">
-          <select id="compare-target" class="select-field">
-            <option value="">-- Select a saved service --</option>
-          </select>
-          <button id="compare-btn" class="btn small">Compare</button>
+
+        <div class="compare-inputs-wrap">
+          <div class="compare-row">
+            <input type="text" id="compare-search-input" list="compare-datalist" class="input-field" placeholder="Type or choose a service name...">
+            <datalist id="compare-datalist"></datalist>
+          </div>
+          <div class="compare-row" style="margin-top: 6px;">
+            <select id="compare-target" class="select-field">
+              <option value="">-- Or select from saved portfolio --</option>
+            </select>
+            <button id="compare-btn" class="btn small">Compare</button>
+          </div>
         </div>
+
         <div id="compare-results" class="compare-results-box hidden"></div>
       </section>
 
-      <!-- Actions -->
+      <!-- 4. Clause Details (Ordered by importance: refunds, cancellation, deletion, sharing, advertisers) -->
+      <section class="card clauses-card" id="card-clauses-section">
+        <div class="clauses-head">
+          <div class="clauses-count-label">Key Policy Details (<span id="clause-count">0</span>)</div>
+          <span class="hint">Ranked by key user decisions and privacy commitments.</span>
+        </div>
+        <div id="clauses-list" class="clauses-list-box"></div>
+      </section>
+
+      <!-- Portfolio Actions -->
       <div class="portfolio-actions">
         <button id="save-btn" class="btn primary">Add to Portfolio</button>
         <button id="open-dash-btn" class="btn ghost">Open Web Dashboard</button>

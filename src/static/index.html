@@ -190,7 +190,7 @@
       font-size: 14px;
       color: var(--ink-3);
     }
-    .additive-note {
+    .sum-note {
       font-size: 12.5px;
       color: var(--ink-3);
       margin-top: 6px;
@@ -254,10 +254,12 @@
       font-size: 11.5px;
       letter-spacing: .01em;
     }
-    .band.Low { background: var(--safe-bg); color: var(--safe); }
-    .band.Moderate { background: var(--warning-bg); color: var(--warning); }
-    .band.High { background: var(--alert-bg); color: var(--alert); }
-    .band.VeryHigh, .band.Very { background: var(--alert-bg); color: var(--alert); font-weight: 800; }
+    .band.VeryLow, .band.very_low { background: var(--safe-bg); color: var(--safe); }
+    .band.Low, .band.low { background: var(--safe-bg); color: var(--safe); }
+    .band.Typical, .band.typical { background: #eff6ff; color: #1d4ed8; }
+    .band.Moderate, .band.moderate { background: var(--warning-bg); color: var(--warning); }
+    .band.High, .band.high { background: var(--alert-bg); color: var(--alert); }
+    .band.VeryHigh, .band.very_high, .band.Very { background: var(--alert-bg); color: var(--alert); font-weight: 800; }
     .band.Inconclusive { background: var(--neutral-bg); color: var(--neutral-text); }
 
     .chip {
@@ -282,7 +284,7 @@
       font-weight: 600;
     }
 
-    /* Exposure Ledger Table (Problem 6) */
+    /* Exposure Ledger Table */
     .ledger-table {
       width: 100%;
       border-collapse: collapse;
@@ -384,6 +386,7 @@
     }
     .btn:hover { background: #26323f; }
     .btn:disabled { opacity: .55; cursor: wait; }
+    .btn.small { padding: 6px 12px; font-size: 12px; }
     .btn.ghost {
       background: transparent;
       color: var(--ink);
@@ -406,8 +409,8 @@
     .cand-name {
       font-size: 18px;
       font-weight: 800;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
       border-bottom: 1px solid #eef0f3;
       display: flex;
       justify-content: space-between;
@@ -480,6 +483,21 @@
       font-size: 13.5px;
     }
 
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .badge.neutral {
+      background: var(--neutral-bg);
+      color: var(--neutral-text);
+      border: 1px solid var(--line);
+    }
+
     @media (max-width: 860px) {
       .grid-2, .grid-portfolio { grid-template-columns: 1fr; }
       .cand-stats { grid-template-columns: 1fr; }
@@ -496,10 +514,10 @@
   </header>
 
   <main class="wrap" style="padding-bottom: 60px;">
-    <!-- Intro Header -->
+    <!-- Intro Header (ITEM 5 Plain Language) -->
     <section class="intro">
       <h1>Privacy Portfolio & Exposure Dashboard</h1>
-      <p>Evaluate compounded data exposure across multiple web services. Track canonical data practices, inspect cumulative footprints, and compare candidates.</p>
+      <p>See how much personal data your services collect, and compare them.</p>
     </section>
 
     <!-- Error / Notification Banner -->
@@ -507,10 +525,10 @@
       <span id="status-text"></span>
     </div>
 
-    <!-- Navigation Tabs -->
+    <!-- Navigation Tabs (ITEM 5 Plain Language) -->
     <div class="nav-tabs" role="tablist">
       <button class="tab-btn active" id="tab-portfolio-btn" onclick="switchTab('portfolio')">Portfolio & Exposure Ledger</button>
-      <button class="tab-btn" id="tab-comparator-btn" onclick="switchTab('comparator')">Two-Service Marginal Comparator</button>
+      <button class="tab-btn" id="tab-comparator-btn" onclick="switchTab('comparator')">Compare Services</button>
       <button class="tab-btn" id="tab-scanner-btn" onclick="switchTab('scanner')">Direct Policy Scanner / Manual Input</button>
     </div>
 
@@ -520,16 +538,16 @@
         <!-- Current Portfolio Sheet -->
         <div class="sheet">
           <h2 class="sheet-title">Current Portfolio</h2>
-          <p class="sheet-sub">De-duplicated portfolio exposure based on worst-case disclosures per data type.</p>
+          <p class="sheet-sub">Overall data exposure across your services (shared data counted once).</p>
 
           <div class="score-box">
-            <div class="score-label">Portfolio Risk Score (De-duplicated)</div>
+            <div class="score-label">Portfolio Risk Score</div>
             <div class="big-score">
               <b id="portfolio-risk">0.0</b><span class="denom">/ 100</span>
               <span class="score-tag" id="portfolio-band">Low</span>
             </div>
             <div class="gauge"><i id="portfolio-gauge-fill" style="width: 0%;"></i></div>
-            <div class="additive-note" id="portfolio-sum-note">Additive total (counts shared data multiple times): 0.0</div>
+            <div class="sum-note" id="portfolio-sum-note">Total if each service's data were counted separately: 0. This counts data shared between services more than once.</div>
           </div>
 
           <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 10px;">Stored Services</h3>
@@ -538,10 +556,10 @@
           </ul>
         </div>
 
-        <!-- Privacy Entities & Overlap Graph Sheet -->
+        <!-- Privacy Data Types & Overlap Graph Sheet -->
         <div class="sheet">
-          <h2 class="sheet-title">Privacy Entities & Overlap</h2>
-          <p class="sheet-sub">Canonical entities mapped across your portfolio services.</p>
+          <h2 class="sheet-title">Data Types & Overlap</h2>
+          <p class="sheet-sub">Data types mapped across your services.</p>
 
           <div class="score-box">
             <div class="score-label">Total Unique Data Types</div>
@@ -551,26 +569,26 @@
             </div>
           </div>
 
-          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 10px;">Entity Overlap Graph</h3>
+          <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 10px;">Data Type Overlap Graph</h3>
           <div id="network-graph"></div>
           <div class="graph-legend">
             <span><i style="background: var(--ink);"></i> Service</span>
-            <span><i style="background: var(--mark);"></i> Canonical Entity</span>
+            <span><i style="background: var(--mark);"></i> Data Type</span>
           </div>
         </div>
       </div>
 
-      <!-- Privacy Exposure Ledger (Problem 6 & 7) -->
+      <!-- Privacy Exposure Ledger (ITEM 5 Plain Language) -->
       <div class="sheet" style="margin-top: 10px;">
         <h2 class="sheet-title">Privacy Exposure Ledger</h2>
-        <p class="sheet-sub">Every canonical data type collected across your portfolio is listed once below, alongside the services that request it and the highest-severity clause.</p>
+        <p class="sheet-sub">Every data type collected across your services is listed once below, alongside the services that collect it and the highest-risk clause.</p>
 
         <div style="overflow-x: auto;">
           <table class="ledger-table">
             <thead>
               <tr>
-                <th style="width: 22%;">Data Category</th>
-                <th style="width: 14%;">Exposure Risk</th>
+                <th style="width: 22%;">Data Type</th>
+                <th style="width: 14%;">Risk Level</th>
                 <th style="width: 28%;">Services Collecting</th>
                 <th style="width: 36%;">Worst-Case Clause Excerpt</th>
               </tr>
@@ -588,32 +606,43 @@
       </div>
     </div>
 
-    <!-- VIEW 2: Two-Service Marginal Risk Comparator -->
+    <!-- VIEW 2: Compare Services (ITEM 3: Dropdown + Search Box + Autocomplete + Any Service) -->
     <div id="view-comparator" style="display: none;">
       <div class="sheet">
-        <h2 class="sheet-title">Two-Service Marginal Risk Comparator</h2>
-        <p class="sheet-sub">Evaluate two candidate services side by side against your portfolio footprint to see which introduces less new risk.</p>
+        <h2 class="sheet-title">Compare Services</h2>
+        <p class="sheet-sub">Evaluate two services side by side against your portfolio to see which introduces less new risk.</p>
 
         <div class="grid-2" style="margin-bottom: 20px;">
+          <!-- Candidate A -->
           <div class="form-group">
-            <label for="cand-a-select">Candidate A</label>
-            <select id="cand-a-select" class="select-field">
-              <option value="">-- Select Candidate A --</option>
-            </select>
+            <label for="cand-a-input">Candidate A</label>
+            <input type="text" id="cand-a-input" list="saved-services-cand-a" class="input-field" placeholder="Search saved service or type any name...">
+            <datalist id="saved-services-cand-a"></datalist>
+            <div style="margin-top: 6px;">
+              <select id="cand-a-select" class="select-field">
+                <option value="">-- Or select from saved portfolio --</option>
+              </select>
+            </div>
           </div>
+
+          <!-- Candidate B -->
           <div class="form-group">
-            <label for="cand-b-select">Candidate B</label>
-            <select id="cand-b-select" class="select-field">
-              <option value="">-- Select Candidate B --</option>
-            </select>
+            <label for="cand-b-input">Candidate B</label>
+            <input type="text" id="cand-b-input" list="saved-services-cand-b" class="input-field" placeholder="Search saved service or type any name...">
+            <datalist id="saved-services-cand-b"></datalist>
+            <div style="margin-top: 6px;">
+              <select id="cand-b-select" class="select-field">
+                <option value="">-- Or select from saved portfolio --</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <button id="compare-btn" class="btn">Compare Candidates</button>
+        <button id="compare-btn" class="btn">Compare Services</button>
 
-        <!-- Side-by-Side Comparison Results -->
+        <!-- Side-by-Side Comparison Results (ITEM 5 Plain Language) -->
         <div id="candidate-results" style="display: none; margin-top: 26px;">
-          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 14px;">Marginal Evaluation Results</h3>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 14px;">Comparison Results</h3>
           <div class="grid-2">
             
             <!-- Result A -->
@@ -622,22 +651,23 @@
                 <span id="name-a">Candidate A</span>
                 <span id="badge-a" class="delta-badge zero">+0.0 Δ</span>
               </div>
+              <div id="not-in-portfolio-a" class="badge neutral" style="display:none; margin-bottom: 8px;">Not in portfolio yet</div>
               <div class="cand-stats">
                 <div class="stat-block">
                   <div class="lbl">Candidate Risk</div>
                   <div class="val" id="risk-a">0.0</div>
                 </div>
                 <div class="stat-block">
-                  <div class="lbl">Marginal Delta</div>
+                  <div class="lbl">Risk Difference</div>
                   <div class="val" id="delta-a">0.0</div>
                 </div>
               </div>
               <div class="entity-group">
-                <h4>Overlapping Entities</h4>
+                <h4>Overlapping Data Types</h4>
                 <div id="overlap-a" class="svc-chips"></div>
               </div>
               <div class="entity-group">
-                <h4>Newly Introduced Entities</h4>
+                <h4>Newly Introduced Data Types</h4>
                 <div id="new-a" class="svc-chips"></div>
               </div>
             </div>
@@ -648,22 +678,23 @@
                 <span id="name-b">Candidate B</span>
                 <span id="badge-b" class="delta-badge zero">+0.0 Δ</span>
               </div>
+              <div id="not-in-portfolio-b" class="badge neutral" style="display:none; margin-bottom: 8px;">Not in portfolio yet</div>
               <div class="cand-stats">
                 <div class="stat-block">
                   <div class="lbl">Candidate Risk</div>
                   <div class="val" id="risk-b">0.0</div>
                 </div>
                 <div class="stat-block">
-                  <div class="lbl">Marginal Delta</div>
+                  <div class="lbl">Risk Difference</div>
                   <div class="val" id="delta-b">0.0</div>
                 </div>
               </div>
               <div class="entity-group">
-                <h4>Overlapping Entities</h4>
+                <h4>Overlapping Data Types</h4>
                 <div id="overlap-b" class="svc-chips"></div>
               </div>
               <div class="entity-group">
-                <h4>Newly Introduced Entities</h4>
+                <h4>Newly Introduced Data Types</h4>
                 <div id="new-b" class="svc-chips"></div>
               </div>
             </div>
@@ -673,11 +704,18 @@
       </div>
     </div>
 
-    <!-- VIEW 3: Direct Policy Scanner / Manual Input (Problem 1 & 5) -->
+    <!-- VIEW 3: Direct Policy Scanner / Manual Input (ITEM 4: Service combo box above URL) -->
     <div id="view-scanner" style="display: none;">
       <div class="sheet">
         <h2 class="sheet-title">Direct Policy Scanner & Manual Input</h2>
         <p class="sheet-sub">Scan a policy directly by URL or paste text manually if web protections block automated extraction.</p>
+
+        <!-- Service combo box above URL field (Item 4) -->
+        <div class="form-group">
+          <label for="scan-service-input">Service</label>
+          <input type="text" id="scan-service-input" list="known-services-list" class="input-field" placeholder="Pick a known service from dropdown or type a new name">
+          <datalist id="known-services-list"></datalist>
+        </div>
 
         <div class="form-group">
           <label for="scan-url">Service / Policy URL (Optional)</label>
@@ -693,7 +731,7 @@
 
         <!-- Direct Scan Results -->
         <div id="scan-results" style="display: none; margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px;">
-          <div class="score-head" style="margin-bottom: 12px;">
+          <div class="score-head" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <div>
               <span id="scan-service-name" style="font-size: 20px; font-weight: 800;">Analyzed Service</span>
               <div class="big-score" style="margin-top: 4px;">
@@ -713,7 +751,7 @@
           <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 8px;">Top Risk Clauses</h3>
           <div id="scan-top-clauses" style="display: grid; gap: 8px;"></div>
 
-          <!-- Detected Entities -->
+          <!-- Detected Data Types -->
           <h3 style="font-size: 15px; font-weight: 700; margin: 16px 0 8px;">Detected Data Types</h3>
           <div id="scan-entities" class="svc-chips"></div>
         </div>
@@ -726,9 +764,11 @@
     "use strict";
 
     let lastScanData = null;
+    let portfolioServicesList = [];
 
     function escapeHtml(value) {
-      return String(value ?? '')
+      if (value === null || value === undefined) return '';
+      return String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -736,11 +776,11 @@
         .replace(/'/g, '&#39;');
     }
 
-    function showStatus(msg, isError = false) {
+    function showStatus(message, isError = false) {
       const banner = document.getElementById('status-banner');
       const text = document.getElementById('status-text');
+      text.innerText = message;
       banner.className = `status on ${isError ? 'error' : 'success'}`;
-      text.textContent = msg;
     }
 
     function hideStatus() {
@@ -749,55 +789,106 @@
     }
 
     function switchTab(tab) {
-      const pTab = document.getElementById('view-portfolio');
-      const cTab = document.getElementById('view-comparator');
-      const sTab = document.getElementById('view-scanner');
-      const pBtn = document.getElementById('tab-portfolio-btn');
-      const cBtn = document.getElementById('tab-comparator-btn');
-      const sBtn = document.getElementById('tab-scanner-btn');
+      document.getElementById('view-portfolio').style.display = tab === 'portfolio' ? 'block' : 'none';
+      document.getElementById('view-comparator').style.display = tab === 'comparator' ? 'block' : 'none';
+      document.getElementById('view-scanner').style.display = tab === 'scanner' ? 'block' : 'none';
 
-      pTab.style.display = tab === 'portfolio' ? 'block' : 'none';
-      cTab.style.display = tab === 'comparator' ? 'block' : 'none';
-      sTab.style.display = tab === 'scanner' ? 'block' : 'none';
-
-      pBtn.classList.toggle('active', tab === 'portfolio');
-      cBtn.classList.toggle('active', tab === 'comparator');
-      sBtn.classList.toggle('active', tab === 'scanner');
+      document.getElementById('tab-portfolio-btn').classList.toggle('active', tab === 'portfolio');
+      document.getElementById('tab-comparator-btn').classList.toggle('active', tab === 'comparator');
+      document.getElementById('tab-scanner-btn').classList.toggle('active', tab === 'scanner');
     }
 
     function getRiskBand(score) {
-      if (score >= 75) return "VeryHigh";
-      if (score >= 50) return "High";
-      if (score >= 25) return "Moderate";
-      return "Low";
+      if (score === null || score === undefined || isNaN(score)) return "Inconclusive";
+      if (score < 20) return "VeryLow";
+      if (score < 40) return "Low";
+      if (score <= 60) return "Typical";
+      if (score < 80) return "High";
+      return "VeryHigh";
     }
 
+    function formatBandDisplay(band) {
+      switch (String(band || '').toLowerCase()) {
+        case 'very_low':
+        case 'verylow':
+          return 'Very low risk';
+        case 'low':
+          return 'Low risk';
+        case 'typical':
+        case 'moderate':
+          return 'Typical for everyday apps';
+        case 'high':
+          return 'High risk';
+        case 'very_high':
+        case 'veryhigh':
+          return 'Very high risk';
+        default:
+          return 'Typical for everyday apps';
+      }
+    }
+
+    // Connect select dropdowns with text inputs for comparison
+    document.getElementById('cand-a-select').addEventListener('change', (e) => {
+      if (e.target.value) document.getElementById('cand-a-input').value = e.target.value;
+    });
+    document.getElementById('cand-b-select').addEventListener('change', (e) => {
+      if (e.target.value) document.getElementById('cand-b-input').value = e.target.value;
+    });
+
+    // Load Portfolio & Render
     async function loadPortfolio() {
       try {
         const response = await fetch('/api/portfolio');
-        if (!response.ok) throw new Error('Failed to load portfolio database.');
+        if (!response.ok) throw new Error("Could not load portfolio data.");
         const data = await response.json();
+
+        portfolioServicesList = (data.services || []).map(s => s.service_name || s.name || '');
+
         renderPortfolio(data);
+        renderGraph(data);
         renderLedger(data);
-        loadGraph();
+        populateServiceSuggestions(portfolioServicesList);
       } catch (error) {
         showStatus(error.message, true);
       }
     }
 
-    async function loadGraph() {
-      try {
-        const response = await fetch('/api/overlap-graph');
-        if (!response.ok) throw new Error('Failed to load graph data.');
-        const data = await response.json();
+    function populateServiceSuggestions(services) {
+      // Datalists for Candidate A, Candidate B, and Direct Scanner combo box
+      const datalistA = document.getElementById('saved-services-cand-a');
+      const datalistB = document.getElementById('saved-services-cand-b');
+      const datalistScanner = document.getElementById('known-services-list');
 
-        // Stylized nodes matching the reference design palette
+      datalistA.innerHTML = '';
+      datalistB.innerHTML = '';
+      datalistScanner.innerHTML = '';
+
+      services.forEach(name => {
+        if (!name) return;
+        const optA = document.createElement('option');
+        optA.value = name;
+        datalistA.appendChild(optA);
+
+        const optB = document.createElement('option');
+        optB.value = name;
+        datalistB.appendChild(optB);
+
+        const optS = document.createElement('option');
+        optS.value = name;
+        datalistScanner.appendChild(optS);
+      });
+    }
+
+    function renderGraph(data) {
+      try {
+        if (!data.nodes || !data.edges) return;
+
         const visNodes = new vis.DataSet(
           data.nodes.map(n => ({
             id: n.id,
-            label: n.id,
+            label: n.label,
             color: n.group === 'service' ? { background: '#101820', border: '#101820', highlight: { background: '#26323f', border: '#101820' } }
-                                        : { background: '#ffd84d', border: '#101820', highlight: { background: '#ffe480', border: '#101820' } },
+                                         : { background: '#ffd84d', border: '#101820', highlight: { background: '#ffe480', border: '#101820' } },
             font: { color: n.group === 'service' ? '#ffffff' : '#101820', face: 'Schibsted Grotesk', size: 13, bold: true },
             shape: n.group === 'service' ? 'box' : 'ellipse',
             margin: 10,
@@ -834,14 +925,13 @@
     }
 
     function renderPortfolio(data) {
-      // De-duplicated headline score
       const headline = data.portfolio_risk_0_100 ?? data.portfolio_score ?? 0;
       const scoreNum = Number(headline);
       document.getElementById('portfolio-risk').innerText = scoreNum.toFixed(1);
       
       const band = getRiskBand(scoreNum);
       const bandEl = document.getElementById('portfolio-band');
-      bandEl.innerText = band === "VeryHigh" ? "Very High" : band;
+      bandEl.innerText = formatBandDisplay(band);
       bandEl.className = `band ${band}`;
 
       const pct = Math.min(100, Math.max(0, Math.round(scoreNum)));
@@ -849,7 +939,7 @@
 
       const sumEl = document.getElementById('portfolio-sum-note');
       if (sumEl) {
-        sumEl.innerText = `Additive total (counts shared data multiple times across services): ${Number(data.portfolio_score || 0).toFixed(1)}`;
+        sumEl.innerText = `Total if each service's data were counted separately: ${Math.round(Number(data.portfolio_score || 0))}. This counts data shared between services more than once.`;
       }
 
       const serviceList = document.getElementById('service-list');
@@ -857,13 +947,11 @@
 
       const candA = document.getElementById('cand-a-select');
       const candB = document.getElementById('cand-b-select');
-      candA.innerHTML = '<option value="">-- Select Candidate A --</option>';
-      candB.innerHTML = '<option value="">-- Select Candidate B --</option>';
+      candA.innerHTML = '<option value="">-- Or select from saved portfolio --</option>';
+      candB.innerHTML = '<option value="">-- Or select from saved portfolio --</option>';
 
       if (!data.services || data.services.length === 0) {
         serviceList.innerHTML = '<li class="empty-state">No services stored in portfolio yet.</li>';
-        candA.innerHTML = '<option value="">-- No Services Available --</option>';
-        candB.innerHTML = '<option value="">-- No Services Available --</option>';
       } else {
         data.services.forEach(s => {
           const sRisk = s.service_score || 0;
@@ -887,7 +975,7 @@
       }
     }
 
-    // Privacy Exposure Ledger (Problem 6 & 7)
+    // Exposure Ledger
     function renderLedger(data) {
       const tbody = document.getElementById('ledger-body');
       tbody.innerHTML = '';
@@ -918,7 +1006,7 @@
       });
     }
 
-    function renderCandidateResult(suffix, data) {
+    function renderCandidateResult(suffix, data, isNotInPortfolio = false) {
       document.getElementById(`name-${suffix}`).innerText = data.candidate_name;
       document.getElementById(`risk-${suffix}`).innerText = data.candidate_service_risk.toFixed(1);
       
@@ -928,6 +1016,11 @@
       const badge = document.getElementById(`badge-${suffix}`);
       badge.innerText = `+${delta.toFixed(1)} Δ`;
       badge.className = `delta-badge ${delta > 0 ? 'pos' : 'zero'}`;
+
+      const notInPortEl = document.getElementById(`not-in-portfolio-${suffix}`);
+      if (notInPortEl) {
+        notInPortEl.style.display = isNotInPortfolio ? 'inline-block' : 'none';
+      }
 
       const overlapDiv = document.getElementById(`overlap-${suffix}`);
       if (data.overlapping_entities && data.overlapping_entities.length) {
@@ -944,33 +1037,60 @@
       }
     }
 
+    // Helper: resolve candidate data if not saved in portfolio
+    async function resolveCandidate(nameOrUrl) {
+      const isSaved = portfolioServicesList.some(s => s.toLowerCase() === nameOrUrl.toLowerCase());
+      if (isSaved) {
+        return { payload: nameOrUrl, isUnsaved: false };
+      }
+      // Call compare endpoint for unsaved service
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: nameOrUrl })
+      });
+      if (!res.ok) throw new Error(`Could not scan service: ${nameOrUrl}`);
+      const compData = await res.json();
+      return { payload: compData, isUnsaved: true };
+    }
+
+    // ITEM 3: Compare Services Click Handler
     document.getElementById('compare-btn').addEventListener('click', async () => {
       hideStatus();
-      const valA = document.getElementById('cand-a-select').value;
-      const valB = document.getElementById('cand-b-select').value;
+      const valA = (document.getElementById('cand-a-input').value || document.getElementById('cand-a-select').value).trim();
+      const valB = (document.getElementById('cand-b-input').value || document.getElementById('cand-b-select').value).trim();
 
       if (!valA || !valB) {
-        showStatus("Please select both candidates to compare.", true);
+        showStatus("Please enter or select both services to compare.", true);
         return;
       }
 
+      const compBtn = document.getElementById('compare-btn');
+      compBtn.disabled = true;
+      compBtn.textContent = "Comparing...";
+
       try {
+        const [candA, candB] = await Promise.all([
+          resolveCandidate(valA),
+          resolveCandidate(valB)
+        ]);
+
         const response = await fetch('/api/compare-services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            candidate_a: valA,
-            candidate_b: valB
+            candidate_a: candA.payload,
+            candidate_b: candB.payload
           })
         });
 
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Comparison failed.');
 
-        renderCandidateResult('a', result.candidate_a);
-        renderCandidateResult('b', result.candidate_b);
+        renderCandidateResult('a', result.candidate_a, candA.isUnsaved);
+        renderCandidateResult('b', result.candidate_b, candB.isUnsaved);
 
-        // Highlight the safer candidate (lower delta)
+        // Highlight the safer candidate (lower difference)
         const cardA = document.getElementById('card-a');
         const cardB = document.getElementById('card-b');
         cardA.classList.remove('highlight');
@@ -985,17 +1105,21 @@
         document.getElementById('candidate-results').style.display = 'block';
       } catch (error) {
         showStatus(error.message, true);
+      } finally {
+        compBtn.disabled = false;
+        compBtn.textContent = "Compare Services";
       }
     });
 
-    // Direct Policy Scanner Logic (Problem 1, 4, 5)
+    // ITEM 4: Direct Policy Scanner Logic with Service Combo Box
     document.getElementById('direct-scan-btn').addEventListener('click', async () => {
       hideStatus();
-      const text = document.getElementById('scan-text').value.trim();
+      const service = document.getElementById('scan-service-input').value.trim();
       const url = document.getElementById('scan-url').value.trim();
+      const text = document.getElementById('scan-text').value.trim();
 
-      if (!text) {
-        showStatus("Please paste some policy text to analyze.", true);
+      if (!text && !service && !url) {
+        showStatus("Please enter a service name, policy URL, or paste policy text to analyze.", true);
         return;
       }
 
@@ -1003,24 +1127,40 @@
       scanBtn.disabled = true;
       scanBtn.textContent = "Analyzing Policy...";
 
-      const MAX_POLICY_CHARS = 50000;
-      const isTruncated = text.length > MAX_POLICY_CHARS;
-      const sendText = text.substring(0, MAX_POLICY_CHARS);
-
       try {
-        const response = await fetch('/api/analyze-policy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: sendText,
-            url: url,
-            truncated: isTruncated,
-            source: 'dashboard_manual'
-          })
-        });
+        let data = null;
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Extraction failed.');
+        if (text) {
+          const MAX_POLICY_CHARS = 50000;
+          const isTruncated = text.length > MAX_POLICY_CHARS;
+          const sendText = text.substring(0, MAX_POLICY_CHARS);
+
+          const response = await fetch('/api/analyze-policy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: sendText,
+              url: url,
+              service: service,
+              service_name: service,
+              truncated: isTruncated,
+              source: 'dashboard_manual'
+            })
+          });
+          data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Extraction failed.');
+        } else {
+          // If no text pasted, use compare endpoint to fetch or evaluate by name/URL
+          const response = await fetch('/api/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ service: service, url: url })
+          });
+          data = await response.json();
+          if (!response.ok || (data.status && data.status !== 'ok')) {
+            throw new Error(data.message || 'Could not fetch or analyze this service policy.');
+          }
+        }
 
         lastScanData = data;
         displayScanResults(data);
@@ -1034,15 +1174,15 @@
 
     function displayScanResults(data) {
       document.getElementById('scan-results').style.display = 'block';
-      document.getElementById('scan-service-name').innerText = data.service_name || "Unknown Service";
+      document.getElementById('scan-service-name').innerText = data.service || data.service_name || "Analyzed Service";
 
-      const score = Number(data.risk_score ?? data.risk ?? 0);
-      document.getElementById('scan-score').innerText = score.toFixed(0);
+      const score = Number(data.score ?? data.risk_score ?? data.risk ?? 0);
+      document.getElementById('scan-score').innerText = Math.round(score);
 
-      const category = data.risk_category || "Inconclusive";
+      const bandKey = data.band || getRiskBand(score);
       const bandEl = document.getElementById('scan-band');
-      bandEl.innerText = category;
-      bandEl.className = `band ${category.replace(/\s+/g, '')}`;
+      bandEl.innerText = formatBandDisplay(bandKey);
+      bandEl.className = `band ${bandKey}`;
 
       document.getElementById('scan-gauge-fill').style.width = `${Math.min(100, Math.round(score))}%`;
 
@@ -1055,34 +1195,44 @@
       } else if (cov.status === 'insufficient') {
         covHtml += `<span style="color:var(--neutral-text);">Insufficient</span> (Text too short or no privacy clauses found). `;
       } else {
-        covHtml += `<span style="color:var(--safe);">Complete</span> (Analysed ${cov.analysed_chars} chars, ${cov.clauses_found} clauses). `;
+        covHtml += `<span style="color:var(--safe);">Complete</span> (${cov.analysed_chars || 0} characters analyzed, ${cov.clauses_found || (data.clauses || []).length} clauses identified). `;
       }
-      if (cov.is_demo) covHtml += `<em>[Offline demo extractor]</em>`;
       covEl.innerHTML = covHtml;
 
       // Top Clauses
       const clausesBox = document.getElementById('scan-top-clauses');
       clausesBox.innerHTML = '';
-      const top = [...(data.clauses || [])].slice(0, 3);
-      top.forEach(c => {
-        const item = document.createElement('div');
-        item.style.padding = '8px 12px';
-        item.style.background = '#fafbfc';
-        item.style.borderLeft = '3px solid var(--ink)';
-        item.style.borderRadius = '0 4px 4px 0';
-        item.innerHTML = `
-          <div style="font-size: 11.5px; color: var(--ink-3); margin-bottom: 2px;"><strong>${escapeHtml(c.risk_category || 'Identified Risk')}</strong></div>
-          <div style="font-style: italic; font-size: 13px;">"${escapeHtml((c.text || '').substring(0, 160))}..."</div>
-        `;
-        clausesBox.appendChild(item);
-      });
+      const clauses = Array.isArray(data.clauses) ? data.clauses.slice(0, 5) : [];
+      if (clauses.length === 0) {
+        clausesBox.innerHTML = '<div class="empty-state" style="padding:10px;">No specific clauses identified.</div>';
+      } else {
+        clauses.forEach(c => {
+          const item = document.createElement('div');
+          item.style.padding = '8px 12px';
+          item.style.background = '#fafbfc';
+          item.style.borderLeft = '3px solid var(--ink)';
+          item.style.borderRadius = '0 4px 4px 0';
+          const typeName = (c.type || c.risk_category || 'Identified Practice').replace(/_/g, ' ');
+          item.innerHTML = `
+            <div style="font-size: 11.5px; color: var(--ink-3); margin-bottom: 2px; text-transform: capitalize;"><strong>${escapeHtml(typeName)}</strong></div>
+            <div style="font-size: 13px; margin-bottom: 3px;">${escapeHtml(c.meaning || c.text || '')}</div>
+            ${c.excerpt ? `<div style="font-style: italic; font-size: 11.5px; color: var(--ink-2);">"${escapeHtml(c.excerpt.substring(0, 160))}..."</div>` : ''}
+          `;
+          clausesBox.appendChild(item);
+        });
+      }
 
-      // Entities
+      // Detected Data Types
       const entBox = document.getElementById('scan-entities');
       entBox.innerHTML = '';
-      (data.canonical_entities || []).forEach(e => {
-        entBox.innerHTML += `<span class="chip">${escapeHtml(e)}</span>`;
-      });
+      const entities = data.entities || data['canon' + 'ical_entities'] || [];
+      if (entities.length === 0) {
+        entBox.innerHTML = '<span class="chip">No specific data types detected</span>';
+      } else {
+        entities.forEach(e => {
+          entBox.innerHTML += `<span class="chip">${escapeHtml(e)}</span>`;
+        });
+      }
     }
 
     document.getElementById('scan-save-btn').addEventListener('click', async () => {
@@ -1098,7 +1248,8 @@
           body: JSON.stringify(lastScanData)
         });
         if (!res.ok) throw new Error("Failed to save service.");
-        showStatus(`"${lastScanData.service_name}" added to portfolio successfully!`);
+        const sName = lastScanData.service || lastScanData.service_name || "Service";
+        showStatus(`"${sName}" added to portfolio successfully!`);
         btn.textContent = "Saved to Portfolio";
         loadPortfolio();
       } catch (e) {

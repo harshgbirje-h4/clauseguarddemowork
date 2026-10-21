@@ -1,0 +1,42 @@
+{
+  "_comment": "MOCK DATA: ClauseGuard standardized mock scan response for testing. Does not contain real service scores.",
+  "service": "Mock Service Alpha",
+  "policy_url": "https://mock-alpha.example.org/privacy",
+  "policy_url_source": "known_mapping",
+  "score": 45,
+  "band": "typical",
+  "status": "ok",
+  "message": null,
+  "clauses": [
+    {
+      "type": "refunds",
+      "meaning": "Provides a 14-day refund window for digital purchases upon customer request.",
+      "what_you_can_do": "Contact customer support within 14 days of purchase if you require a refund.",
+      "excerpt": "You may request a full refund within 14 days of your initial purchase by contacting customer support."
+    },
+    {
+      "type": "subscription_cancellation",
+      "meaning": "Subscriptions can be cancelled anytime and remain active until the billing cycle ends.",
+      "what_you_can_do": "Cancel your subscription in account settings before your next renewal date.",
+      "excerpt": "You can cancel your recurring subscription at any time from your account settings page."
+    },
+    {
+      "type": "data_deletion",
+      "meaning": "You can request complete deletion of your account and personal records.",
+      "what_you_can_do": "Submit an account deletion request through your privacy settings dashboard.",
+      "excerpt": "Users may permanently delete their account and associated data through the privacy settings panel."
+    },
+    {
+      "type": "third_party_sharing",
+      "meaning": "Shares device identifiers and usage telemetry with external analytics and advertising partners.",
+      "what_you_can_do": "Turn off non-essential tracking cookies in cookie preferences.",
+      "excerpt": "We disclose usage information and device identifiers to trusted third-party advertising partners."
+    },
+    {
+      "type": "targeted_advertising",
+      "meaning": "Uses browsing history and cookie data to deliver personalized advertising across websites.",
+      "what_you_can_do": "Opt out of targeted advertising in your account settings.",
+      "excerpt": "Our partners may collect web browsing activity to serve interest-based advertisements across other sites."
+    }
+  ]
+}

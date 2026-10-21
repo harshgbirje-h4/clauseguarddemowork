@@ -1,0 +1,30 @@
+{
+  "_comment": "MOCK DATA: ClauseGuard standardized mock compare response for unsaved service. Does not contain real service scores.",
+  "service": "Mock Service Beta",
+  "policy_url": "https://mock-beta.example.org/privacy",
+  "policy_url_source": "known_mapping",
+  "score": 28,
+  "band": "low",
+  "status": "ok",
+  "message": null,
+  "clauses": [
+    {
+      "type": "refunds",
+      "meaning": "Offers full 30-day money-back guarantee for any cancellation.",
+      "what_you_can_do": "Request a refund from support within 30 days of purchase.",
+      "excerpt": "We offer a 30-day money back guarantee for all customer subscriptions upon notice."
+    },
+    {
+      "type": "data_deletion",
+      "meaning": "Users can permanently delete all personal data at any time from account settings.",
+      "what_you_can_do": "Use the self-service account deletion tool in settings.",
+      "excerpt": "You may permanently delete your account and all associated profile information at any time."
+    },
+    {
+      "type": "data_security",
+      "meaning": "Applies industry standard encryption to stored user records.",
+      "what_you_can_do": "Enable two-factor authentication for additional protection.",
+      "excerpt": "Personal records are secured using standard encryption both in transit and at rest."
+    }
+  ]
+}

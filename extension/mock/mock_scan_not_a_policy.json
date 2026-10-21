@@ -1,0 +1,11 @@
+{
+  "_comment": "MOCK DATA: ClauseGuard standardized mock scan response for non-policy page. Does not contain real service scores.",
+  "service": "Mock Code Repository",
+  "policy_url": "https://code.example.org/project/readme",
+  "policy_url_source": "page_search",
+  "score": null,
+  "band": null,
+  "status": "not_a_policy",
+  "message": "This page doesn't look like a privacy policy. Open the policy page directly or paste the text.",
+  "clauses": []
+}

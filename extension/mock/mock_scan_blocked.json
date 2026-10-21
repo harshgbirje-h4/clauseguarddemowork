@@ -1,0 +1,11 @@
+{
+  "_comment": "MOCK DATA: ClauseGuard standardized mock scan response for blocked/captcha page. Does not contain real service scores.",
+  "service": "Mock Protected Service",
+  "policy_url": "https://protected.example.org/privacy",
+  "policy_url_source": "page_search",
+  "score": null,
+  "band": null,
+  "status": "blocked",
+  "message": "Automated fetch blocked by website protection. Open the policy page directly or paste the text.",
+  "clauses": []
+}
